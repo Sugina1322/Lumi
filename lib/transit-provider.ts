@@ -1,11 +1,14 @@
 /**
  * Transit data provider.
  *
- * Uses Google Routes API when EXPO_PUBLIC_GOOGLE_MAPS_API_KEY is present.
+ * Uses Google Routes API when EXPO_PUBLIC_GOOGLE_ROUTES_API_KEY is present.
  * Falls back to distance-based estimates when live routing is unavailable.
  */
 
 import { RouteOption, TransportMode } from './route-algorithm';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+import { supabase } from './supabase';
 
 export interface Location {
   name: string;
@@ -29,8 +32,22 @@ export const KNOWN_LOCATIONS: Location[] = [
   { name: 'Orchard Rd, Singapore', lat: 1.3048, lng: 103.8318 },
 ];
 
-const GOOGLE_API_KEY = (process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '').trim();
+const GOOGLE_ROUTES_API_KEY = (process.env.EXPO_PUBLIC_GOOGLE_ROUTES_API_KEY ?? '').trim();
 const GOOGLE_ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
+const ANDROID_PACKAGE_NAME = 'com.sugina.lumi';
+const ANDROID_CERT_SHA1 = (process.env.EXPO_PUBLIC_ANDROID_CERT_SHA1 ?? 'BE:07:D2:06:8C:3E:89:1A:BB:46:06:EB:F4:12:65:BB:F1:AB:2B:F6')
+  .replace(/[^a-fA-F0-9]/g, '')
+  .toUpperCase();
+
+function isExpoGo() {
+  return Constants.executionEnvironment === 'storeClient';
+}
+
+function fieldMaskForMode(travelMode: 'TRANSIT' | 'DRIVE' | 'WALK') {
+  return travelMode === 'TRANSIT'
+    ? 'routes.duration,routes.distanceMeters,routes.legs.duration,routes.legs.distanceMeters,routes.legs.steps.staticDuration,routes.legs.steps.distanceMeters,routes.legs.steps.navigationInstruction,routes.legs.steps.transitDetails,routes.legs.steps.travelMode,routes.travelAdvisory.transitFare'
+    : 'routes.duration,routes.distanceMeters,routes.legs.duration,routes.legs.distanceMeters,routes.legs.steps.staticDuration,routes.legs.steps.distanceMeters,routes.legs.steps.navigationInstruction';
+}
 
 type LatLng = { latitude: number; longitude: number };
 
@@ -409,7 +426,7 @@ async function fetchGoogleRoutes(
     transitRoutingPreference?: 'LESS_WALKING' | 'FEWER_TRANSFERS';
   },
 ): Promise<{ data: GoogleRoutesResponse | null; error?: string }> {
-  if (!GOOGLE_API_KEY) return { data: null, error: 'Missing Google Maps API key.' };
+  if (!GOOGLE_ROUTES_API_KEY) return { data: null, error: 'Missing Google Routes API key.' };
 
   const body: Record<string, unknown> = {
     origin: { address: from },
@@ -429,16 +446,20 @@ async function fetchGoogleRoutes(
     };
   }
 
-  const fieldMask = travelMode === 'TRANSIT'
-    ? 'routes.duration,routes.distanceMeters,routes.legs.duration,routes.legs.distanceMeters,routes.legs.steps.staticDuration,routes.legs.steps.distanceMeters,routes.legs.steps.navigationInstruction,routes.legs.steps.transitDetails,routes.legs.steps.travelMode,routes.travelAdvisory.transitFare'
-    : 'routes.duration,routes.distanceMeters,routes.legs.duration,routes.legs.distanceMeters,routes.legs.steps.staticDuration,routes.legs.steps.distanceMeters,routes.legs.steps.navigationInstruction';
+  const fieldMask = fieldMaskForMode(travelMode);
 
   const response = await fetch(GOOGLE_ROUTES_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Goog-Api-Key': GOOGLE_API_KEY,
+      'X-Goog-Api-Key': GOOGLE_ROUTES_API_KEY,
       'X-Goog-FieldMask': fieldMask,
+      ...(Platform.OS === 'android'
+        ? {
+            'X-Android-Package': ANDROID_PACKAGE_NAME,
+            'X-Android-Cert': ANDROID_CERT_SHA1,
+          }
+        : {}),
     },
     body: JSON.stringify(body),
   });
@@ -452,6 +473,41 @@ async function fetchGoogleRoutes(
   }
 
   return { data: (await response.json()) as GoogleRoutesResponse };
+}
+
+async function fetchGoogleRoutesViaProxy(
+  from: string,
+  to: string,
+  travelMode: 'TRANSIT' | 'DRIVE' | 'WALK',
+  options?: {
+    computeAlternativeRoutes?: boolean;
+    transitRoutingPreference?: 'LESS_WALKING' | 'FEWER_TRANSFERS';
+  },
+): Promise<{ data: GoogleRoutesResponse | null; error?: string }> {
+  const { data, error } = await supabase.functions.invoke('google-routes', {
+    body: {
+      from,
+      to,
+      travelMode,
+      options,
+      fieldMask: fieldMaskForMode(travelMode),
+    },
+  });
+
+  if (error) {
+    return { data: null, error: `Routes proxy failed. ${error.message}`.trim() };
+  }
+
+  if (!data) {
+    return { data: null, error: 'Routes proxy returned an empty response.' };
+  }
+
+  if (typeof data === 'object' && data && 'error' in data) {
+    const proxyError = (data as { error?: string }).error;
+    return { data: null, error: proxyError || 'Routes proxy returned an error.' };
+  }
+
+  return { data: data as GoogleRoutesResponse };
 }
 
 function buildFallbackRoutes(from: string, to: string): RouteOption[] {
@@ -524,7 +580,7 @@ function buildFallbackRoutes(from: string, to: string): RouteOption[] {
 }
 
 export function isLiveTransitEnabled() {
-  return GOOGLE_API_KEY.length > 0;
+  return true;
 }
 
 export async function fetchRoutes(from: string, to: string): Promise<RouteFetchResult> {
@@ -534,7 +590,49 @@ export async function fetchRoutes(from: string, to: string): Promise<RouteFetchR
 
   idCounter = 0;
 
-  if (GOOGLE_API_KEY) {
+  try {
+    const [transitResponse, driveResponse, walkResponse] = await Promise.all([
+      fetchGoogleRoutesViaProxy(origin, destination, 'TRANSIT', {
+        computeAlternativeRoutes: true,
+        transitRoutingPreference: 'LESS_WALKING',
+      }),
+      fetchGoogleRoutesViaProxy(origin, destination, 'DRIVE'),
+      fetchGoogleRoutesViaProxy(origin, destination, 'WALK'),
+    ]);
+
+    const liveErrors = [transitResponse.error, driveResponse.error, walkResponse.error].filter(Boolean) as string[];
+    const liveRoutes: RouteOption[] = [];
+    const transitRoutes = transitResponse.data?.routes ?? [];
+
+    for (const route of transitRoutes.slice(0, 4)) {
+      const parsed = buildTransitRoute(route, origin, destination, liveRoutes.length);
+      if (parsed) liveRoutes.push(parsed);
+    }
+
+    const driveRoute = driveResponse.data?.routes?.[0];
+    if (driveRoute) {
+      const parsed = buildDriveRoute(driveRoute, origin, destination);
+      if (parsed) liveRoutes.push(parsed);
+    }
+
+    const walkRoute = walkResponse.data?.routes?.[0];
+    if (walkRoute) {
+      const parsed = buildWalkRoute(walkRoute, origin, destination);
+      if (parsed) liveRoutes.push(parsed);
+    }
+
+    if (liveRoutes.length > 0) {
+      return {
+        routes: liveRoutes,
+        source: 'live',
+        message: liveErrors.length > 0 ? liveErrors[0] : undefined,
+      };
+    }
+  } catch {
+    // Fall through to direct or local fallback.
+  }
+
+  if (GOOGLE_ROUTES_API_KEY && !isExpoGo()) {
     try {
       const [transitResponse, driveResponse, walkResponse] = await Promise.all([
         fetchGoogleRoutes(origin, destination, 'TRANSIT', {
@@ -587,6 +685,10 @@ export async function fetchRoutes(from: string, to: string): Promise<RouteFetchR
   return {
     routes: buildFallbackRoutes(origin, destination),
     source: 'fallback',
-    message: GOOGLE_API_KEY ? 'Live routing failed, so Lumi used local estimates.' : 'No Google Maps key detected, so Lumi used local estimates.',
+    message: isExpoGo()
+      ? 'Live routing needs the deployed routes proxy or a dev build with a working Android Routes key. Lumi used local estimates instead.'
+      : GOOGLE_ROUTES_API_KEY
+        ? 'Live routing failed, so Lumi used local estimates.'
+        : 'No Google Routes key detected, so Lumi used local estimates.',
   };
 }

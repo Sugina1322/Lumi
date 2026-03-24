@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
-    "start": ".\\node_modules\\.bin\\expo.cmd start --port 8082",
-    "android": ".\\node_modules\\.bin\\expo.cmd start --android --port 8082",
-    "ios": ".\\node_modules\\.bin\\expo.cmd start --ios --port 8082",
-    "web": ".\\node_modules\\.bin\\expo.cmd start --web --port 8082"
+    "start": ".\\node_modules\\.bin\\expo.cmd start --max-workers 1",
+    "start:lan": ".\\node_modules\\.bin\\expo.cmd start --lan --max-workers 1",
+    "start:tunnel": "set ANDROID_HOME=Z:\\\\__expo_no_adb__&& set ANDROID_SDK_ROOT=Z:\\\\__expo_no_adb__&& .\\node_modules\\.bin\\expo.cmd start --tunnel --max-workers 1",
+    "android": ".\\node_modules\\.bin\\expo.cmd start --android --max-workers 1",
+    "ios": ".\\node_modules\\.bin\\expo.cmd start --ios --max-workers 1",
+    "web": ".\\node_modules\\.bin\\expo.cmd start --web --max-workers 1"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -37,6 +39,7 @@
     "react-native-web": "~0.21.0"
   },
   "devDependencies": {
+    "@expo/ngrok": "^4.1.3",
     "@types/react": "~19.1.0",
     "typescript": "~5.9.2"
   },
