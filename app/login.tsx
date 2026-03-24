@@ -34,11 +34,6 @@ export default function LoginScreen() {
   const heroHeight  = height * 0.38;
   const isNarrow    = width < 375;
   const hPad        = isNarrow ? 18 : 24;
-  const authHighlights = [
-    { icon: 'sparkles-outline' as const, text: 'Fast sign-in' },
-    { icon: 'shield-checkmark-outline' as const, text: 'Secure session' },
-    { icon: 'mail-outline' as const, text: 'Email fallback' },
-  ];
 
   function switchMode(next: 'signin' | 'signup' | 'forgot') {
     setError(null);
@@ -90,7 +85,7 @@ export default function LoginScreen() {
     const { error } = await signInWithGoogle();
     setLoading(false);
     if (error) setError(error);
-    else router.replace('/(tabs)');
+    else setInfo('Finishing Google sign-in...');
   }
 
   return (
@@ -129,15 +124,6 @@ export default function LoginScreen() {
             {mode === 'signup' && 'Start planning your next adventure.'}
             {mode === 'forgot' && "We'll send a reset link to your email."}
           </Text>
-
-          <View style={styles.infoRail}>
-            {authHighlights.map((item) => (
-              <View key={item.text} style={[styles.infoPill, { backgroundColor: theme.primarySoft, borderColor: theme.border }]}>
-                <Ionicons name={item.icon} size={13} color={theme.primary} />
-                <Text style={styles.infoPillText}>{item.text}</Text>
-              </View>
-            ))}
-          </View>
 
           <View style={styles.modeTabs}>
             <Pressable
@@ -364,28 +350,6 @@ const styles = StyleSheet.create({
     color: '#6B5F8A',
     fontSize: 14,
     lineHeight: 20,
-  },
-  infoRail: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 16,
-  },
-  infoPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: '#F7F3FF',
-    borderWidth: 1,
-    borderColor: '#E8E0FB',
-  },
-  infoPillText: {
-    color: '#5A4E78',
-    fontSize: 12,
-    fontWeight: '700',
   },
   errorText: {
     marginTop: 14,

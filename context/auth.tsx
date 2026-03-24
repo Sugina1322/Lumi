@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
+import { makeRedirectUri } from 'expo-auth-session';
+import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '../lib/supabase';
@@ -19,6 +21,17 @@ type AuthContextType = {
 };
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
+
+function getGoogleRedirectUri() {
+  if (Constants.executionEnvironment === 'storeClient') {
+    return Linking.createURL('/auth/callback');
+  }
+
+  return makeRedirectUri({
+    scheme: 'lumi',
+    path: 'auth/callback',
+  });
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -48,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signInWithGoogle() {
-    const redirectTo = Linking.createURL('/auth/callback');
+    const redirectTo = getGoogleRedirectUri();
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -68,8 +81,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
-    if (result.type !== 'success' || !result.url) {
+    if (result.type === 'cancel' || result.type === 'dismiss') {
       return { error: 'Google sign-in was cancelled.' };
+    }
+
+    if (result.type !== 'success' || !result.url) {
+      return { error: 'Google sign-in did not complete correctly.' };
     }
 
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(result.url);

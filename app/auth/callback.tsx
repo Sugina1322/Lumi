@@ -1,16 +1,22 @@
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/auth';
 
 export default function AuthCallbackScreen() {
   const { session, loading } = useAuth();
+  const [settled, setSettled] = useState(false);
 
   useEffect(() => {
-    if (loading) return;
+    const timeout = setTimeout(() => setSettled(true), 1200);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  useEffect(() => {
+    if (loading || !settled) return;
     router.replace(session ? '/(tabs)' : '/login');
-  }, [loading, session]);
+  }, [loading, session, settled]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
