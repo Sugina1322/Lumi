@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -19,7 +19,7 @@ import { useAuth } from '../context/auth';
 import { useAppTheme } from '../lib/app-theme';
 
 export default function LoginScreen() {
-  const { signIn, signUp, signInWithGoogle, signInAsGuest, resetPassword } = useAuth();
+  const { session, loading: authLoading, signIn, signUp, signInWithGoogle, signInAsGuest, resetPassword } = useAuth();
   const { theme } = useAppTheme();
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -40,6 +40,11 @@ export default function LoginScreen() {
     setInfo(null);
     setMode(next);
   }
+
+  useEffect(() => {
+    if (authLoading || !session) return;
+    router.replace('/(tabs)');
+  }, [authLoading, session]);
 
   async function handleSubmit() {
     if (mode === 'forgot') {
@@ -63,9 +68,10 @@ export default function LoginScreen() {
       setError(error);
     } else if (mode === 'signup') {
       setInfo('Check your email to confirm your account, then sign in.');
-      switchMode('signin');
+      setError(null);
+      setMode('signin');
     } else {
-      router.replace('/(tabs)');
+      setInfo('Signing you in...');
     }
   }
 
@@ -75,7 +81,7 @@ export default function LoginScreen() {
     const { error } = await signInAsGuest();
     setLoading(false);
     if (error) setError(error);
-    else router.replace('/(tabs)');
+    else setInfo('Signing you in...');
   }
 
   async function handleGoogle() {

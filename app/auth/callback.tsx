@@ -6,17 +6,23 @@ import { useAuth } from '../../context/auth';
 
 export default function AuthCallbackScreen() {
   const { session, loading } = useAuth();
-  const [settled, setSettled] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
-    const timeout = setTimeout(() => setSettled(true), 1200);
+    const timeout = setTimeout(() => setTimedOut(true), 8000);
     return () => clearTimeout(timeout);
   }, []);
 
   useEffect(() => {
-    if (loading || !settled) return;
-    router.replace(session ? '/(tabs)' : '/login');
-  }, [loading, session, settled]);
+    if (loading) return;
+    if (session) {
+      router.replace('/(tabs)');
+      return;
+    }
+    if (timedOut) {
+      router.replace('/login');
+    }
+  }, [loading, session, timedOut]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
