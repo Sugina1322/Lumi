@@ -14,54 +14,72 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useRef } from 'react';
 import { useAuth } from '../context/auth';
+import { useAppTheme } from '../lib/app-theme';
 
 type Props = { visible: boolean; onClose: () => void };
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
-type MenuItem = { label: string; icon: IoniconName; onPress?: () => void; danger?: boolean };
-type Section  = { title: string; items: MenuItem[] };
+type MenuItem = { label: string; icon: IoniconName; onPress?: () => void };
+type Section = { title: string; items: MenuItem[] };
 
 export function SideMenu({ visible, onClose }: Props) {
   const { user, signOut } = useAuth();
-  const { width }  = useWindowDimensions();
-  const insets     = useSafeAreaInsets();
+  const { theme } = useAppTheme();
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
-  const sheetWidth    = Math.min(width * 0.82, 310);
+  const sheetWidth = Math.min(width * 0.84, 324);
   const sheetWidthRef = useRef(sheetWidth);
   sheetWidthRef.current = sheetWidth;
 
-  const translateX     = useRef(new Animated.Value(-sheetWidth)).current;
-  const backdropAnim   = useRef(new Animated.Value(0)).current;
+  const translateX = useRef(new Animated.Value(-sheetWidth)).current;
+  const backdropAnim = useRef(new Animated.Value(0)).current;
 
-  const isGuest    = !user?.email;
-  const initials   = user?.email?.[0]?.toUpperCase() ?? 'G';
-  const firstName  = isGuest ? 'Guest' : (user?.email?.split('@')[0] ?? '');
-  const emailLabel = isGuest ? 'Browsing as guest' : (user?.email ?? '');
+  const isGuest = !user?.email;
+  const initials = user?.email?.[0]?.toUpperCase() ?? 'G';
+  const firstName = isGuest ? 'Guest' : user?.email?.split('@')[0] ?? '';
+  const emailLabel = isGuest ? 'Browsing as guest' : user?.email ?? '';
 
-  /* ── Open animation ── */
   useEffect(() => {
-    if (visible) {
-      translateX.setValue(-sheetWidthRef.current);
-      backdropAnim.setValue(0);
-      Animated.parallel([
-        Animated.spring(translateX, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 180 }),
-        Animated.timing(backdropAnim, { toValue: 1, duration: 260, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [visible]);
+    if (!visible) return;
 
-  /* ── Close animation then call onClose ── */
-  function closeWithAnimation(cb?: () => void) {
+    translateX.setValue(-sheetWidthRef.current);
+    backdropAnim.setValue(0);
     Animated.parallel([
-      Animated.timing(translateX, { toValue: -sheetWidthRef.current, duration: 230, useNativeDriver: true }),
-      Animated.timing(backdropAnim, { toValue: 0, duration: 230, useNativeDriver: true }),
-    ]).start(() => { onClose(); cb?.(); });
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 22,
+        stiffness: 180,
+      }),
+      Animated.timing(backdropAnim, {
+        toValue: 1,
+        duration: 240,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [backdropAnim, translateX, visible]);
+
+  function closeWithAnimation(callback?: () => void) {
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: -sheetWidthRef.current,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropAnim, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onClose();
+      callback?.();
+    });
   }
 
-  /* ── Swipe-to-close gesture ── */
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, { dx, dy }) =>
-        dx < -10 && Math.abs(dx) > Math.abs(dy) * 1.5,
+      onMoveShouldSetPanResponder: (_, { dx, dy }) => dx < -10 && Math.abs(dx) > Math.abs(dy) * 1.5,
       onPanResponderMove: (_, { dx }) => {
         if (dx < 0) translateX.setValue(dx);
       },
@@ -69,13 +87,16 @@ export function SideMenu({ visible, onClose }: Props) {
         if (dx < -(sheetWidthRef.current * 0.3) || vx < -0.6) {
           closeWithAnimation();
         } else {
-          Animated.spring(translateX, { toValue: 0, useNativeDriver: true, damping: 20 }).start();
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            damping: 20,
+          }).start();
         }
       },
-    })
+    }),
   ).current;
 
-  /* ── Sign out ── */
   async function handleSignOut() {
     closeWithAnimation(async () => {
       await signOut();
@@ -91,23 +112,23 @@ export function SideMenu({ visible, onClose }: Props) {
     {
       title: 'Travel',
       items: [
-        { label: 'Home',         icon: 'home-outline',     onPress: () => navigate('/(tabs)') },
-        { label: 'Trips',        icon: 'airplane-outline', onPress: () => navigate('/(tabs)/trips') },
-        { label: 'Saved places', icon: 'heart-outline',    onPress: () => navigate('/(tabs)/saved') },
+        { label: 'Home', icon: 'compass-outline', onPress: () => navigate('/(tabs)') },
+        { label: 'Trips', icon: 'map-outline', onPress: () => navigate('/(tabs)/trips') },
+        { label: 'Saved places', icon: 'bookmark-outline', onPress: () => navigate('/(tabs)/saved') },
       ],
     },
     {
       title: 'Tools',
       items: [
         { label: 'Commute guide', icon: 'navigate-outline', onPress: () => navigate('/commute') },
-        { label: 'Travel budget', icon: 'wallet-outline',   onPress: () => navigate('/budget') },
-        { label: 'Expenses',      icon: 'receipt-outline',  onPress: () => navigate('/expenses') },
+        { label: 'Travel budget', icon: 'wallet-outline', onPress: () => navigate('/budget') },
+        { label: 'Expenses', icon: 'receipt-outline', onPress: () => navigate('/expenses') },
       ],
     },
     {
       title: 'Account',
       items: [
-        { label: 'Profile',  icon: 'person-outline',   onPress: () => navigate('/profile') },
+        { label: 'Profile', icon: 'person-outline', onPress: () => navigate('/profile') },
         { label: 'Settings', icon: 'settings-outline', onPress: () => navigate('/settings') },
       ],
     },
@@ -116,91 +137,120 @@ export function SideMenu({ visible, onClose }: Props) {
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={() => closeWithAnimation()}>
       <View style={styles.root}>
-
-        {/* ── Animated backdrop ── */}
         <Animated.View style={[StyleSheet.absoluteFillObject, styles.backdrop, { opacity: backdropAnim }]}>
           <Pressable style={StyleSheet.absoluteFillObject} onPress={() => closeWithAnimation()} />
         </Animated.View>
 
-        {/* ── Drawer sheet ── */}
         <Animated.View
-          style={[styles.sheet, { width: sheetWidth, transform: [{ translateX }] }]}
+          style={[
+            styles.sheet,
+            {
+              width: sheetWidth,
+              transform: [{ translateX }],
+              backgroundColor: theme.card,
+              shadowColor: theme.shadow,
+            },
+          ]}
           {...panResponder.panHandlers}
         >
-          {/* Purple header */}
-          <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-            <View style={styles.headerOrbTR} />
-            <View style={styles.headerOrbBL} />
+          <View style={[styles.header, { paddingTop: insets.top + 16, backgroundColor: theme.hero }]}>
+            <View style={[styles.headerGlowLarge, { backgroundColor: theme.heroAlt }]} />
+            <View style={[styles.headerGlowSmall, { backgroundColor: theme.accent }]} />
 
             <View style={styles.headerTopRow}>
               <Text style={styles.appName}>lumi</Text>
-              <Pressable style={styles.closeBtn} onPress={() => closeWithAnimation()} hitSlop={10}>
-                <Ionicons name="close" size={17} color="rgba(255,255,255,0.75)" />
+              <Pressable style={styles.closeButton} onPress={() => closeWithAnimation()} hitSlop={10}>
+                <Ionicons name="close" size={17} color="rgba(255,255,255,0.82)" />
               </Pressable>
             </View>
 
-            <View style={styles.avatarWrap}>
-              <Text style={styles.avatarText}>{initials}</Text>
+            <View style={styles.profileRow}>
+              <View style={styles.avatarWrap}>
+                <Text style={styles.avatarText}>{initials}</Text>
+              </View>
+              <View style={styles.profileCopy}>
+                <Text style={styles.userName} numberOfLines={1}>{firstName}</Text>
+                <Text style={styles.userEmail} numberOfLines={1}>{emailLabel}</Text>
+              </View>
             </View>
-            <Text style={styles.userName} numberOfLines={1}>{firstName}</Text>
-            <Text style={styles.userEmail} numberOfLines={1}>{emailLabel}</Text>
 
-            {/* Swipe hint */}
-            <View style={styles.swipeHint}>
+            <View style={styles.headerFooter}>
+              <Text style={styles.headerFooterText}>Swipe left to close</Text>
               <View style={styles.swipeBar} />
             </View>
           </View>
 
-          {/* Guest upgrade banner */}
-          {isGuest && (
-            <Pressable style={styles.banner} onPress={() => closeWithAnimation(() => router.replace('/login'))}>
-              <View style={styles.bannerIcon}>
-                <Ionicons name="sparkles" size={14} color="#7055C8" />
+          {isGuest ? (
+            <Pressable
+              style={[styles.banner, { backgroundColor: theme.primarySoft, borderColor: theme.border }]}
+              onPress={() => closeWithAnimation(() => router.replace('/login'))}
+            >
+              <View style={[styles.bannerIcon, { backgroundColor: theme.card }]}>
+                <Ionicons name="sparkles" size={14} color={theme.primary} />
               </View>
-              <Text style={styles.bannerText}>Create an account to save your trips</Text>
-              <Ionicons name="arrow-forward" size={13} color="#7055C8" />
+              <Text style={[styles.bannerText, { color: theme.text }]}>Create an account to save your trips and places</Text>
+              <Ionicons name="arrow-forward" size={14} color={theme.primary} />
             </Pressable>
-          )}
+          ) : null}
 
-          {/* Scrollable sections */}
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
             showsVerticalScrollIndicator={false}
           >
-            {sections.map((section, si) => (
-              <View key={section.title} style={[styles.section, si > 0 && styles.sectionDivider]}>
-                <Text style={styles.sectionLabel}>{section.title}</Text>
+            {sections.map((section, index) => (
+              <View
+                key={section.title}
+                style={[
+                  styles.section,
+                  index > 0 && {
+                    borderTopWidth: 1,
+                    borderTopColor: theme.border,
+                    marginTop: 8,
+                    paddingTop: 16,
+                  },
+                ]}
+              >
+                <Text style={[styles.sectionLabel, { color: theme.mutedText }]}>{section.title}</Text>
                 {section.items.map((item) => (
                   <Pressable
                     key={item.label}
-                    style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+                    style={({ pressed }) => [
+                      styles.item,
+                      {
+                        backgroundColor: pressed ? theme.surfaceAlt : 'transparent',
+                      },
+                    ]}
                     onPress={item.onPress}
                   >
-                    <View style={styles.itemIcon}>
-                      <Ionicons name={item.icon} size={17} color="#7055C8" />
+                    <View style={[styles.itemIcon, { backgroundColor: theme.primarySoft }]}>
+                      <Ionicons name={item.icon} size={17} color={theme.primary} />
                     </View>
-                    <Text style={styles.itemLabel}>{item.label}</Text>
-                    <Ionicons name="chevron-forward" size={13} color="#D0C8EC" />
+                    <Text style={[styles.itemLabel, { color: theme.text }]}>{item.label}</Text>
+                    <Ionicons name="chevron-forward" size={14} color={theme.mutedText} />
                   </Pressable>
                 ))}
               </View>
             ))}
 
-            {/* Sign out */}
-            <View style={[styles.section, styles.sectionDivider]}>
+            <View style={[styles.section, { borderTopWidth: 1, borderTopColor: theme.border, marginTop: 8, paddingTop: 16 }]}>
               <Pressable
-                style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+                style={({ pressed }) => [
+                  styles.item,
+                  {
+                    backgroundColor: pressed ? '#FFF1F5' : 'transparent',
+                  },
+                ]}
                 onPress={handleSignOut}
               >
                 <View style={[styles.itemIcon, styles.itemIconDanger]}>
                   <Ionicons name="log-out-outline" size={17} color="#C0396A" />
                 </View>
-                <Text style={[styles.itemLabel, styles.itemLabelDanger]}>Sign out</Text>
+                <Text style={styles.itemLabelDanger}>Sign out</Text>
               </Pressable>
             </View>
 
-            <Text style={styles.version}>Lumi · v1.0.0</Text>
+            <Text style={[styles.version, { color: theme.mutedText }]}>Lumi · v1.0.0</Text>
           </ScrollView>
         </Animated.View>
       </View>
@@ -209,38 +259,45 @@ export function SideMenu({ visible, onClose }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root:    { flex: 1 },
-  backdrop: { backgroundColor: 'rgba(18, 12, 38, 0.45)' },
-
-  /* sheet */
+  root: {
+    flex: 1,
+  },
+  backdrop: {
+    backgroundColor: 'rgba(16, 14, 24, 0.45)',
+  },
   sheet: {
     position: 'absolute',
-    left: 0, top: 0, bottom: 0,
-    backgroundColor: '#FAFAFE',
-    shadowColor: '#1E1640',
-    shadowOffset: { width: 10, height: 0 },
-    shadowOpacity: 0.18,
-    shadowRadius: 28,
-    elevation: 24,
+    left: 0,
+    top: 0,
+    bottom: 0,
     overflow: 'hidden',
+    shadowOffset: { width: 12, height: 0 },
+    shadowOpacity: 0.16,
+    shadowRadius: 26,
+    elevation: 20,
   },
-
-  /* header */
   header: {
-    backgroundColor: '#7055C8',
     paddingHorizontal: 20,
     paddingBottom: 20,
     overflow: 'hidden',
   },
-  headerOrbTR: {
-    position: 'absolute', top: -30, right: -30,
-    width: 120, height: 120, borderRadius: 60,
-    backgroundColor: '#9078E0', opacity: 0.35,
+  headerGlowLarge: {
+    position: 'absolute',
+    top: -34,
+    right: -24,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    opacity: 0.34,
   },
-  headerOrbBL: {
-    position: 'absolute', bottom: -20, left: -20,
-    width: 90, height: 90, borderRadius: 45,
-    backgroundColor: '#5A44A8', opacity: 0.4,
+  headerGlowSmall: {
+    position: 'absolute',
+    bottom: -24,
+    left: -24,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    opacity: 0.22,
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -249,94 +306,147 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   appName: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 16,
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 15,
     fontWeight: '900',
     letterSpacing: 2.5,
+    textTransform: 'lowercase',
   },
-  closeBtn: {
-    width: 30, height: 30, borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center', justifyContent: 'center',
+  closeButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
   },
   avatarWrap: {
-    width: 56, height: 56, borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 10,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
+    width: 58,
+    height: 58,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
   },
-  avatarText: { color: '#FFFFFF', fontSize: 22, fontWeight: '800' },
-  userName:   { color: '#FFFFFF', fontSize: 15, fontWeight: '800', marginBottom: 3 },
-  userEmail:  { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
-  swipeHint:  { alignItems: 'flex-end', marginTop: 14 },
-  swipeBar: {
-    width: 28, height: 3, borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+  avatarText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '900',
   },
-
-  /* banner */
-  banner: {
+  profileCopy: {
+    flex: 1,
+  },
+  userName: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  userEmail: {
+    marginTop: 4,
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  headerFooter: {
+    marginTop: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+  },
+  headerFooterText: {
+    color: 'rgba(255,255,255,0.68)',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  swipeBar: {
+    width: 28,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.28)',
+  },
+  banner: {
     marginHorizontal: 14,
     marginTop: 12,
-    backgroundColor: '#EDE8FF',
-    borderRadius: 14,
+    borderRadius: 18,
+    borderWidth: 1,
     paddingHorizontal: 12,
-    paddingVertical: 11,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   bannerIcon: {
-    width: 26, height: 26, borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  bannerText: { flex: 1, color: '#5B48A8', fontSize: 12, fontWeight: '700', lineHeight: 16 },
-
-  /* sections */
-  scroll:        { flex: 1 },
-  scrollContent: { paddingTop: 14 },
-  section:       { paddingHorizontal: 10, paddingBottom: 6 },
-  sectionDivider:{ marginTop: 6, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#EEEAF8' },
+  bannerText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '700',
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: 16,
+  },
+  section: {
+    paddingHorizontal: 12,
+    paddingBottom: 4,
+  },
   sectionLabel: {
-    color: '#B0A8D0',
     fontSize: 10,
     fontWeight: '800',
     textTransform: 'uppercase',
-    letterSpacing: 1.4,
+    letterSpacing: 1.2,
     paddingHorizontal: 8,
-    marginBottom: 4,
+    marginBottom: 6,
   },
-
-  /* items */
   item: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 13,
+    borderRadius: 16,
     paddingVertical: 10,
     paddingHorizontal: 8,
   },
-  itemPressed:      { backgroundColor: '#F0ECFF' },
   itemIcon: {
-    width: 34, height: 34, borderRadius: 10,
-    backgroundColor: '#EDE8FF',
-    alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  itemIconDanger:   { backgroundColor: '#FFF0F4' },
-  itemLabel:        { flex: 1, color: '#2F2257', fontSize: 14, fontWeight: '600' },
-  itemLabelDanger:  { color: '#C0396A' },
-
+  itemIconDanger: {
+    backgroundColor: '#FFF0F4',
+  },
+  itemLabel: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  itemLabelDanger: {
+    flex: 1,
+    color: '#C0396A',
+    fontSize: 14,
+    fontWeight: '700',
+  },
   version: {
     textAlign: 'center',
-    color: '#C4BCDC',
     fontSize: 11,
-    fontWeight: '600',
-    marginTop: 20,
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    marginTop: 18,
+    letterSpacing: 0.4,
   },
 });

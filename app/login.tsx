@@ -19,26 +19,34 @@ import { useAuth } from '../context/auth';
 import { useAppTheme } from '../lib/app-theme';
 
 export default function LoginScreen() {
-  const { session, loading: authLoading, signIn, signUp, signInWithGoogle, signInAsGuest, resetPassword } = useAuth();
+  const {
+    session,
+    loading: authLoading,
+    signIn,
+    signUp,
+    signInWithGoogle,
+    signInAsGuest,
+    resetPassword,
+  } = useAuth();
   const { theme } = useAppTheme();
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  const [email, setEmail]       = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
-  const [info, setInfo]         = useState<string | null>(null);
-  const [mode, setMode]         = useState<'signin' | 'signup' | 'forgot'>('signin');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
 
-  const heroHeight  = height * 0.38;
-  const isNarrow    = width < 375;
-  const hPad        = isNarrow ? 18 : 24;
+  const heroHeight = height * 0.37;
+  const isNarrow = width < 375;
+  const horizontalPadding = isNarrow ? 18 : 24;
 
-  function switchMode(next: 'signin' | 'signup' | 'forgot') {
+  function switchMode(nextMode: 'signin' | 'signup' | 'forgot') {
     setError(null);
     setInfo(null);
-    setMode(next);
+    setMode(nextMode);
   }
 
   useEffect(() => {
@@ -48,27 +56,35 @@ export default function LoginScreen() {
 
   async function handleSubmit() {
     if (mode === 'forgot') {
-      if (!email) { setError('Please enter your email.'); return; }
+      if (!email) {
+        setError('Please enter your email.');
+        return;
+      }
+
       setLoading(true);
       setError(null);
-      const { error } = await resetPassword(email);
+      const result = await resetPassword(email);
       setLoading(false);
-      if (error) setError(error);
+
+      if (result.error) setError(result.error);
       else setInfo('Check your email for a password reset link.');
       return;
     }
-    if (!email || !password) { setError('Please fill in all fields.'); return; }
+
+    if (!email || !password) {
+      setError('Please fill in all fields.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    const { error } = mode === 'signin'
-      ? await signIn(email, password)
-      : await signUp(email, password);
+    const result = mode === 'signin' ? await signIn(email, password) : await signUp(email, password);
     setLoading(false);
-    if (error) {
-      setError(error);
+
+    if (result.error) {
+      setError(result.error);
     } else if (mode === 'signup') {
       setInfo('Check your email to confirm your account, then sign in.');
-      setError(null);
       setMode('signin');
     } else {
       setInfo('Signing you in...');
@@ -78,9 +94,10 @@ export default function LoginScreen() {
   async function handleGuest() {
     setLoading(true);
     setError(null);
-    const { error } = await signInAsGuest();
+    const result = await signInAsGuest();
     setLoading(false);
-    if (error) setError(error);
+
+    if (result.error) setError(result.error);
     else setInfo('Signing you in...');
   }
 
@@ -88,98 +105,108 @@ export default function LoginScreen() {
     setLoading(true);
     setError(null);
     setInfo(null);
-    const { error } = await signInWithGoogle();
+    const result = await signInWithGoogle();
     setLoading(false);
-    if (error) setError(error);
+
+    if (result.error) setError(result.error);
     else setInfo('Finishing Google sign-in...');
   }
 
   return (
-      <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: theme.primary }]}
+    <KeyboardAvoidingView
+      style={[styles.root, { backgroundColor: theme.hero }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* ── Hero ── */}
       <View style={[styles.hero, { height: heroHeight, paddingTop: insets.top + 10 }]}>
-        <View style={[styles.heroOrbTR, { backgroundColor: theme.heroAlt }]} />
-        <View style={[styles.heroOrbBL, { backgroundColor: theme.shadow }]} />
-        <LumiLogo size={isNarrow ? 'md' : 'lg'} variant="light" />
-        <Text style={[styles.heroTagline, { fontSize: isNarrow ? 12 : 13 }]}>
-          your travel companion
-        </Text>
+        <View style={[styles.heroGlowLarge, { backgroundColor: theme.heroAlt }]} />
+        <View style={[styles.heroGlowSmall, { backgroundColor: theme.accent }]} />
+
+        <View style={styles.heroInner}>
+          <LumiLogo size={isNarrow ? 'md' : 'lg'} variant="light" />
+          <Text style={styles.heroEyebrow}>your city companion</Text>
+          <Text style={styles.heroTitle}>Travel planning that feels calm before you even open the map.</Text>
+        </View>
       </View>
 
-      {/* ── Form sheet ── */}
       <ScrollView
-        style={styles.sheet}
+        style={[styles.sheet, { backgroundColor: theme.surface }]}
         contentContainerStyle={[
           styles.sheetContent,
-          { paddingHorizontal: hPad, paddingBottom: insets.bottom + 28 },
+          { paddingHorizontal: horizontalPadding, paddingBottom: insets.bottom + 28 },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.card, { backgroundColor: theme.card }]}>
-          <Text style={[styles.formTitle, { fontSize: isNarrow ? 22 : 27 }]}>
-            {mode === 'signin' && 'Welcome back'}
-            {mode === 'signup' && 'Create account'}
-            {mode === 'forgot' && 'Reset password'}
-          </Text>
-          <Text style={styles.formSubtitle}>
-            {mode === 'signin' && 'Sign in to access your trips and saved places.'}
-            {mode === 'signup' && 'Start planning your next adventure.'}
-            {mode === 'forgot' && "We'll send a reset link to your email."}
-          </Text>
-
-          <View style={styles.modeTabs}>
-            <Pressable
-              style={[
-                styles.modeTab,
-                { backgroundColor: theme.primarySoft, borderColor: theme.border },
-                mode === 'signin' && { backgroundColor: theme.primary, borderColor: theme.primary },
-              ]}
-              onPress={() => switchMode('signin')}
-            >
-              <Text style={[styles.modeTabText, mode === 'signin' && styles.modeTabTextActive]}>
-                Sign in
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.modeTab,
-                { backgroundColor: theme.primarySoft, borderColor: theme.border },
-                mode === 'signup' && { backgroundColor: theme.primary, borderColor: theme.primary },
-              ]}
-              onPress={() => switchMode('signup')}
-            >
-              <Text style={[styles.modeTabText, mode === 'signup' && styles.modeTabTextActive]}>
-                Create
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.modeTab,
-                { backgroundColor: theme.primarySoft, borderColor: theme.border },
-                mode === 'forgot' && { backgroundColor: theme.primary, borderColor: theme.primary },
-              ]}
-              onPress={() => switchMode('forgot')}
-            >
-              <Text style={[styles.modeTabText, mode === 'forgot' && styles.modeTabTextActive]}>
-                Reset
-              </Text>
-            </Pressable>
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+              shadowColor: theme.shadow,
+            },
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <Text style={[styles.formTitle, { color: theme.text }]}>
+              {mode === 'signin' && 'Welcome back'}
+              {mode === 'signup' && 'Create account'}
+              {mode === 'forgot' && 'Reset password'}
+            </Text>
+            <Text style={[styles.formSubtitle, { color: theme.mutedText }]}>
+              {mode === 'signin' && 'Sign in to access your saved places, trips, and commute history.'}
+              {mode === 'signup' && 'Start shaping your next move with one account.'}
+              {mode === 'forgot' && "We'll send a reset link to your email."}
+            </Text>
           </View>
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          {info ? <Text style={styles.infoText}>{info}</Text> : null}
+          <View style={[styles.modeTabs, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
+            {[
+              ['signin', 'Sign in'],
+              ['signup', 'Create'],
+              ['forgot', 'Reset'],
+            ].map(([value, label]) => {
+              const active = mode === value;
+
+              return (
+                <Pressable
+                  key={value}
+                  style={[
+                    styles.modeTab,
+                    active && { backgroundColor: theme.card, shadowColor: theme.shadow },
+                  ]}
+                  onPress={() => switchMode(value as 'signin' | 'signup' | 'forgot')}
+                >
+                  <Text style={[styles.modeTabText, { color: active ? theme.text : theme.mutedText }]}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {error ? (
+            <View style={styles.messageRow}>
+              <Ionicons name="alert-circle" size={16} color="#C0396A" />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          {info ? (
+            <View style={styles.messageRow}>
+              <Ionicons name="checkmark-circle" size={16} color="#2F8F68" />
+              <Text style={styles.infoText}>{info}</Text>
+            </View>
+          ) : null}
 
           {mode !== 'forgot' && (
             <>
               <Pressable
                 style={[
-                  styles.googleBtn,
-                  { backgroundColor: theme.card, borderColor: theme.border },
-                  loading && styles.primaryBtnDisabled,
+                  styles.googleButton,
+                  {
+                    backgroundColor: theme.card,
+                    borderColor: theme.border,
+                  },
+                  loading && styles.disabled,
                 ]}
                 onPress={handleGoogle}
                 disabled={loading}
@@ -189,24 +216,31 @@ export default function LoginScreen() {
                 ) : (
                   <>
                     <Ionicons name="logo-google" size={18} color={theme.text} />
-                    <Text style={styles.googleBtnText}>Continue with Google</Text>
+                    <Text style={[styles.googleButtonText, { color: theme.text }]}>Continue with Google</Text>
                   </>
                 )}
               </Pressable>
 
               <View style={styles.dividerRow}>
                 <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
-                <Text style={styles.dividerText}>or use email</Text>
+                <Text style={[styles.dividerText, { color: theme.mutedText }]}>or use email</Text>
                 <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
               </View>
             </>
           )}
 
-          <View style={styles.fields}>
+          <View style={styles.fieldGroup}>
             <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Email</Text>
+              <Text style={[styles.fieldLabel, { color: theme.text }]}>Email</Text>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.border,
+                    color: theme.text,
+                  },
+                ]}
                 placeholder="you@example.com"
                 placeholderTextColor={theme.mutedText}
                 value={email}
@@ -219,15 +253,23 @@ export default function LoginScreen() {
             {mode !== 'forgot' && (
               <View style={styles.field}>
                 <View style={styles.fieldLabelRow}>
-                  <Text style={styles.fieldLabel}>Password</Text>
-                  {mode === 'signin' && (
+                  <Text style={[styles.fieldLabel, { color: theme.text }]}>Password</Text>
+                  {mode === 'signin' ? (
                     <Pressable onPress={() => switchMode('forgot')} hitSlop={8}>
-                      <Text style={styles.forgotLink}>Forgot?</Text>
+                      <Text style={[styles.inlineLink, { color: theme.primary }]}>Forgot?</Text>
                     </Pressable>
-                  )}
+                  ) : null}
                 </View>
+
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                      color: theme.text,
+                    },
+                  ]}
                   placeholder="Your password"
                   placeholderTextColor={theme.mutedText}
                   secureTextEntry
@@ -240,21 +282,22 @@ export default function LoginScreen() {
 
           <Pressable
             style={[
-              styles.primaryBtn,
-              { backgroundColor: theme.primary, shadowColor: theme.primary },
-              loading && styles.primaryBtnDisabled,
+              styles.primaryButton,
+              { backgroundColor: theme.primary, shadowColor: theme.shadow },
+              loading && styles.disabled,
             ]}
             onPress={handleSubmit}
             disabled={loading}
           >
-            {loading
-              ? <ActivityIndicator color="#FFFFFF" />
-              : <Text style={styles.primaryBtnText}>
-                  {mode === 'signin' && 'Sign in'}
-                  {mode === 'signup' && 'Create account'}
-                  {mode === 'forgot' && 'Send reset link'}
-                </Text>
-            }
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.primaryButtonText}>
+                {mode === 'signin' && 'Sign in'}
+                {mode === 'signup' && 'Create account'}
+                {mode === 'forgot' && 'Send reset link'}
+              </Text>
+            )}
           </Pressable>
 
           {mode === 'forgot' ? (
@@ -262,21 +305,28 @@ export default function LoginScreen() {
               <Text style={[styles.textActionText, { color: theme.primary }]}>Back to sign in</Text>
             </Pressable>
           ) : (
-            <Pressable
-              style={styles.textAction}
-              onPress={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
-            >
+            <Pressable style={styles.textAction} onPress={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}>
               <Text style={[styles.textActionText, { color: theme.primary }]}>
                 {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
               </Text>
             </Pressable>
           )}
 
-          {mode !== 'forgot' && (
-            <Pressable style={[styles.guestBtn, { borderColor: theme.border }]} onPress={handleGuest} disabled={loading}>
-              <Text style={styles.guestBtnText}>Continue as guest</Text>
+          {mode !== 'forgot' ? (
+            <Pressable
+              style={[
+                styles.guestButton,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: theme.border,
+                },
+              ]}
+              onPress={handleGuest}
+              disabled={loading}
+            >
+              <Text style={[styles.guestButtonText, { color: theme.mutedText }]}>Continue as guest</Text>
             </Pressable>
-          )}
+          ) : null}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -286,118 +336,150 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#7055C8',
   },
-
-  /* hero */
   hero: {
-    alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
     overflow: 'hidden',
   },
-  heroOrbTR: {
+  heroGlowLarge: {
     position: 'absolute',
-    top: -30,
-    right: -30,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: '#9078E0',
-    opacity: 0.5,
+    top: -40,
+    right: -20,
+    width: 210,
+    height: 210,
+    borderRadius: 105,
+    opacity: 0.36,
   },
-  heroOrbBL: {
+  heroGlowSmall: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 12,
     left: -40,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#5A44A8',
-    opacity: 0.5,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    opacity: 0.2,
   },
-  heroTagline: {
-    color: 'rgba(255,255,255,0.75)',
-    fontWeight: '600',
-    letterSpacing: 0.5,
+  heroInner: {
+    alignItems: 'center',
+    paddingHorizontal: 28,
   },
-
-  /* sheet */
+  heroEyebrow: {
+    marginTop: 16,
+    color: 'rgba(255,255,255,0.74)',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+  heroTitle: {
+    marginTop: 12,
+    color: '#FFFFFF',
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '900',
+    textAlign: 'center',
+    maxWidth: 330,
+  },
   sheet: {
     flex: 1,
-    backgroundColor: '#F5F0FF',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
     marginTop: -28,
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
   },
   sheetContent: {
     paddingTop: 28,
   },
-
   card: {
-    borderRadius: 28,
-    backgroundColor: '#FFFFFF',
+    borderRadius: 30,
+    borderWidth: 1,
     padding: 20,
-    shadowColor: '#4C3D81',
-    shadowOffset: { width: 0, height: 12 },
+    shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 4,
+    shadowRadius: 26,
+    elevation: 8,
   },
-
-  /* form */
+  cardHeader: {
+    marginBottom: 16,
+  },
   formTitle: {
-    color: '#1E1640',
-    fontWeight: '900',
+    fontSize: 27,
     lineHeight: 32,
+    fontWeight: '900',
   },
   formSubtitle: {
-    marginTop: 6,
-    color: '#6B5F8A',
+    marginTop: 8,
     fontSize: 14,
     lineHeight: 20,
   },
-  errorText: {
-    marginTop: 14,
-    color: '#C0396A',
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 19,
-  },
-  infoText: {
-    marginTop: 14,
-    color: '#3A7A58',
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 19,
-  },
   modeTabs: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 5,
+    gap: 6,
   },
   modeTab: {
     flex: 1,
-    borderRadius: 999,
-    backgroundColor: '#F4F0FF',
+    borderRadius: 14,
     paddingVertical: 11,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E7DFFE',
-  },
-  modeTabActive: {
-    backgroundColor: '#7055C8',
-    borderColor: '#7055C8',
   },
   modeTabText: {
-    color: '#5B48A8',
     fontSize: 12,
     fontWeight: '800',
   },
-  modeTabTextActive: {
-    color: '#FFFFFF',
+  messageRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 14,
+    alignItems: 'flex-start',
   },
-  fields: {
+  errorText: {
+    flex: 1,
+    color: '#C0396A',
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '600',
+  },
+  infoText: {
+    flex: 1,
+    color: '#2F8F68',
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '600',
+  },
+  googleButton: {
+    marginTop: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  googleButtonText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 18,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  fieldGroup: {
     marginTop: 18,
     gap: 14,
   },
@@ -410,81 +492,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fieldLabel: {
-    color: '#2F2257',
     fontSize: 13,
     fontWeight: '700',
   },
-  forgotLink: {
-    color: '#7055C8',
+  inlineLink: {
     fontSize: 13,
-    fontWeight: '700',
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: '#E4DCFB',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    color: '#1E1640',
-    fontSize: 15,
-  },
-
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 16,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#DDD2FA',
-  },
-  dividerText: {
-    color: '#8B7BB5',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-
-  googleBtn: {
-    marginTop: 16,
-    borderRadius: 999,
-    backgroundColor: '#FCFAFF',
-    borderWidth: 1.5,
-    borderColor: '#D9CCF8',
-    paddingVertical: 15,
-    paddingHorizontal: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 10,
-  },
-  googleBtnText: {
-    color: '#2F2257',
-    fontSize: 14,
     fontWeight: '800',
   },
-
-  /* buttons */
-  primaryBtn: {
+  input: {
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+  },
+  primaryButton: {
     marginTop: 20,
     borderRadius: 999,
-    backgroundColor: '#7055C8',
     paddingVertical: 16,
     alignItems: 'center',
-    shadowColor: '#7055C8',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.30,
-    shadowRadius: 12,
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
     elevation: 6,
   },
-  primaryBtnDisabled: {
-    opacity: 0.7,
-  },
-  primaryBtnText: {
+  primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
@@ -494,22 +527,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   textActionText: {
-    color: '#5B48A8',
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '800',
   },
-  guestBtn: {
-    marginTop: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#DDD2FA',
+  guestButton: {
+    marginTop: 12,
     borderRadius: 999,
-    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    paddingVertical: 13,
+    alignItems: 'center',
   },
-  guestBtnText: {
-    color: '#6B5F8A',
+  guestButtonText: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  disabled: {
+    opacity: 0.7,
   },
 });

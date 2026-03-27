@@ -15,22 +15,39 @@ import * as Location from 'expo-location';
 import MapView from 'react-native-maps';
 import { useAuth } from '../../context/auth';
 import { SideMenu } from '../../components/side-menu';
+import { useAppTheme } from '../../lib/app-theme';
 
 const quickActions = [
-  { label: 'Find route',      icon: 'navigate-outline'  as const, route: '/commute',  accent: '#7055C8' },
-  { label: 'Travel budget',   icon: 'wallet-outline'    as const, route: '/budget',   accent: '#4CAF50' },
-  { label: 'Expenses',        icon: 'receipt-outline'   as const, route: '/expenses', accent: '#FF8C42' },
+  { label: 'Find route', icon: 'navigate-outline' as const, route: '/commute', accent: '#4D8CFF' },
+  { label: 'Travel budget', icon: 'wallet-outline' as const, route: '/budget', accent: '#2F9D76' },
+  { label: 'Expenses', icon: 'receipt-outline' as const, route: '/expenses', accent: '#E2884A' },
+];
+
+const tripCards = [
+  {
+    title: 'Tokyo Spring Escape',
+    detail: '5 days · food crawl + city walk',
+    status: 'Next up',
+    emoji: 'JP',
+  },
+  {
+    title: 'Seoul Cafe Weekend',
+    detail: '12 places saved · 4 notes',
+    status: 'Planning',
+    emoji: 'KR',
+  },
 ];
 
 function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
   return 'Good evening';
 }
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const { theme } = useAppTheme();
   const { width } = useWindowDimensions();
   const [menuVisible, setMenuVisible] = useState(false);
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
@@ -47,124 +64,215 @@ export default function HomeScreen() {
         setLocationLoading(false);
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({});
-      setLocation(loc);
+
+      const nextLocation = await Location.getCurrentPositionAsync({});
+      setLocation(nextLocation);
       setLocationLoading(false);
 
       try {
-        const [place] = await Location.reverseGeocodeAsync(loc.coords);
+        const [place] = await Location.reverseGeocodeAsync(nextLocation.coords);
         if (place) {
           const parts = [place.street, place.district, place.city].filter(Boolean);
           setAddress(parts.join(', ') || 'Unknown location');
         }
       } catch {
-        // reverse geocode is best-effort
+        // Reverse geocoding is best-effort only.
       }
     })();
   }, []);
 
   const handleRecenter = () => {
-    if (location && mapRef.current) {
-      mapRef.current.animateToRegion({
+    if (!location || !mapRef.current) return;
+
+    mapRef.current.animateToRegion(
+      {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
         latitudeDelta: 0.01,
         longitudeDelta: 0.01,
-      }, 500);
-    }
+      },
+      500,
+    );
   };
 
-  const isNarrow   = width < 375;
-  const hPad       = isNarrow ? 16 : 20;
-  const cardRadius = isNarrow ? 22 : 26;
-
-  const firstName  = user?.email?.split('@')[0] ?? 'traveler';
-  const initials   = firstName[0]?.toUpperCase() ?? 'L';
+  const isNarrow = width < 375;
+  const horizontalPadding = isNarrow ? 16 : 20;
+  const firstName = user?.email?.split('@')[0] ?? 'traveler';
+  const initials = firstName[0]?.toUpperCase() ?? 'L';
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
-      <View style={[styles.header, { paddingHorizontal: hPad }]}>
-        <Pressable style={styles.iconBtn} onPress={() => setMenuVisible(true)} hitSlop={6}>
-          <Ionicons name="menu-outline" size={24} color="#2F2257" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.surface }]}>
+      <View style={[styles.backgroundGlowTop, { backgroundColor: theme.primarySoft }]} />
+      <View style={[styles.backgroundGlowBottom, { backgroundColor: theme.surfaceAlt }]} />
+
+      <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
+        <Pressable
+          style={[
+            styles.iconButton,
+            {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+              shadowColor: theme.shadow,
+            },
+          ]}
+          onPress={() => setMenuVisible(true)}
+          hitSlop={6}
+        >
+          <Ionicons name="menu-outline" size={22} color={theme.text} />
         </Pressable>
-        <Text style={styles.headerWordmark}>lumi</Text>
-        <Pressable style={styles.iconBtn} hitSlop={6}>
-          <Ionicons name="notifications-outline" size={22} color="#2F2257" />
+
+        <View style={[styles.wordmarkChip, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <Text style={[styles.wordmark, { color: theme.text }]}>lumi</Text>
+        </View>
+
+        <Pressable
+          style={[
+            styles.iconButton,
+            {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+              shadowColor: theme.shadow,
+            },
+          ]}
+          onPress={() => router.push('/profile')}
+          hitSlop={6}
+        >
+          <Text style={[styles.iconButtonText, { color: theme.primary }]}>{initials}</Text>
         </Pressable>
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingHorizontal: hPad }]}
+        contentContainerStyle={[styles.content, { paddingHorizontal: horizontalPadding }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Greeting */}
         <View style={styles.greetingRow}>
-          <View style={styles.greetingText}>
-            <Text style={[styles.greetingLabel, { fontSize: isNarrow ? 13 : 15 }]}>
-              {getGreeting()},
+          <View style={styles.greetingCopy}>
+            <Text style={[styles.greetingLabel, { color: theme.mutedText }]}>{getGreeting()}</Text>
+            <Text style={[styles.greetingTitle, { color: theme.text }]}>
+              Move through the city with less friction.
             </Text>
-            <Text style={[styles.greetingName, { fontSize: isNarrow ? 24 : 28 }]}>
-              {firstName} ✦
+            <Text style={[styles.greetingSubcopy, { color: theme.mutedText }]}>
+              {firstName}, your routes, saved spots, and trip plans are all lined up here.
             </Text>
           </View>
-          <Pressable onPress={() => router.push('/profile')}>
-            <View style={[styles.avatar, { width: isNarrow ? 44 : 50, height: isNarrow ? 44 : 50, borderRadius: isNarrow ? 22 : 25 }]}>
-              <Text style={[styles.avatarText, { fontSize: isNarrow ? 17 : 20 }]}>{initials}</Text>
+          <View style={[styles.avatarShell, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
+              <Text style={styles.avatarText}>{initials}</Text>
             </View>
-          </Pressable>
+          </View>
         </View>
 
-        {/* Commute hero card */}
-        <Pressable style={[styles.heroCard, { borderRadius: cardRadius }]} onPress={() => router.push('/commute')}>
-          <View style={styles.heroOrbTR} />
-          <View style={styles.heroOrbBL} />
-          <Text style={styles.heroLabel}>Commute guide</Text>
-          <Text style={[styles.heroTitle, { fontSize: isNarrow ? 20 : 23 }]}>
-            Where are you headed?{'\n'}Let Lumi find your best route.
-          </Text>
-          <View style={styles.heroBtn}>
-            <Ionicons name="navigate" size={14} color="#7055C8" />
-            <Text style={styles.heroBtnText}>Find route</Text>
-            <Ionicons name="arrow-forward" size={14} color="#7055C8" />
+        <Pressable
+          style={[styles.heroCard, { backgroundColor: theme.hero, shadowColor: theme.shadow }]}
+          onPress={() => router.push('/commute')}
+        >
+          <View style={[styles.heroGlowLarge, { backgroundColor: theme.heroAlt }]} />
+          <View style={[styles.heroGlowSmall, { backgroundColor: theme.accent }]} />
+
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroCopy}>
+              <Text style={styles.heroEyebrow}>Today&apos;s focus</Text>
+              <Text style={styles.heroTitle}>Find the fastest commute without giving up comfort.</Text>
+              <Text style={styles.heroSubtitle}>
+                Lumi blends route quality, transfers, walking distance, and cost into one clean recommendation.
+              </Text>
+            </View>
+            <View style={styles.heroStatRail}>
+              <View style={styles.heroStatCard}>
+                <Text style={styles.heroStatValue}>3</Text>
+                <Text style={styles.heroStatLabel}>Saved trips</Text>
+              </View>
+              <View style={styles.heroStatCardMuted}>
+                <Text style={styles.heroStatValue}>12m</Text>
+                <Text style={styles.heroStatLabel}>To next train</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.heroActionRow}>
+            <View style={styles.heroPrimaryAction}>
+              <Ionicons name="navigate" size={14} color={theme.hero} />
+              <Text style={[styles.heroPrimaryActionText, { color: theme.hero }]}>Plan a route</Text>
+            </View>
+            <View style={styles.heroSecondaryMeta}>
+              <Ionicons name="sparkles" size={13} color="#FFFFFF" />
+              <Text style={styles.heroSecondaryMetaText}>Adaptive ranking</Text>
+            </View>
           </View>
         </Pressable>
 
-        {/* Quick actions */}
-        <Text style={[styles.sectionTitle, { fontSize: isNarrow ? 16 : 18 }]}>Quick actions</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick actions</Text>
+          <Text style={[styles.sectionHint, { color: theme.mutedText }]}>Jump back in</Text>
+        </View>
+
         <View style={styles.actionsRow}>
-          {quickActions.map((a) => (
+          {quickActions.map((action) => (
             <Pressable
-              key={a.label}
-              style={[styles.actionCard, { borderRadius: cardRadius - 4 }]}
-              onPress={() => router.push(a.route as never)}
+              key={action.label}
+              style={[
+                styles.actionCard,
+                {
+                  backgroundColor: theme.card,
+                  borderColor: theme.border,
+                  shadowColor: theme.shadow,
+                },
+              ]}
+              onPress={() => router.push(action.route as never)}
             >
-              <View style={[styles.actionIconWrap, { backgroundColor: a.accent + '18' }]}>
-                <Ionicons name={a.icon} size={20} color={a.accent} />
+              <View style={[styles.actionIconWrap, { backgroundColor: `${action.accent}15` }]}>
+                <Ionicons name={action.icon} size={20} color={action.accent} />
               </View>
-              <Text style={[styles.actionLabel, { fontSize: isNarrow ? 11 : 12 }]}>{a.label}</Text>
+              <Text style={[styles.actionLabel, { color: theme.text }]}>{action.label}</Text>
+              <Text style={[styles.actionMeta, { color: theme.mutedText }]}>Open</Text>
             </Pressable>
           ))}
         </View>
 
-        {/* Map card */}
-        <View style={[styles.mapCard, { borderRadius: cardRadius }]}>
+        <View
+          style={[
+            styles.mapCard,
+            {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+              shadowColor: theme.shadow,
+            },
+          ]}
+        >
+          <View style={styles.mapHeader}>
+            <View>
+              <Text style={[styles.cardEyebrow, { color: theme.primary }]}>Live location</Text>
+              <Text style={[styles.cardTitle, { color: theme.text }]}>Your city snapshot</Text>
+            </View>
+            <Pressable
+              style={[styles.inlineButton, { backgroundColor: theme.primarySoft }]}
+              onPress={() => router.push('/commute')}
+            >
+              <Text style={[styles.inlineButtonText, { color: theme.primary }]}>Route</Text>
+            </Pressable>
+          </View>
+
           {locationLoading ? (
             <View style={styles.mapPlaceholder}>
-              <ActivityIndicator size="large" color="#7055C8" />
-              <Text style={styles.mapPlaceholderText}>Finding your location...</Text>
+              <ActivityIndicator size="large" color={theme.primary} />
+              <Text style={[styles.mapPlaceholderTitle, { color: theme.text }]}>Finding your location</Text>
+              <Text style={[styles.mapPlaceholderCopy, { color: theme.mutedText }]}>
+                We&apos;re pulling in your current position for route suggestions.
+              </Text>
             </View>
           ) : locationError ? (
             <View style={styles.mapPlaceholder}>
-              <View style={styles.mapErrorIcon}>
-                <Ionicons name="location-outline" size={28} color="#7055C8" />
+              <View style={[styles.placeholderIcon, { backgroundColor: theme.primarySoft }]}>
+                <Ionicons name="location-outline" size={24} color={theme.primary} />
               </View>
-              <Text style={styles.mapPlaceholderText}>{locationError}</Text>
-              <Text style={styles.mapPlaceholderSub}>Enable location to see the map</Text>
+              <Text style={[styles.mapPlaceholderTitle, { color: theme.text }]}>{locationError}</Text>
+              <Text style={[styles.mapPlaceholderCopy, { color: theme.mutedText }]}>
+                Turn location on to unlock a live map and faster commute suggestions.
+              </Text>
             </View>
           ) : location ? (
             <>
-              <View style={[styles.mapContainer, { borderRadius: cardRadius }]}>
+              <View style={styles.mapShell}>
                 <MapView
                   ref={mapRef}
                   style={styles.map}
@@ -178,70 +286,69 @@ export default function HomeScreen() {
                   showsMyLocationButton={false}
                   showsCompass={false}
                 />
-                <Pressable style={styles.recenterBtn} onPress={handleRecenter}>
-                  <Ionicons name="locate" size={18} color="#7055C8" />
+                <Pressable
+                  style={[styles.recenterButton, { backgroundColor: theme.card, borderColor: theme.border }]}
+                  onPress={handleRecenter}
+                >
+                  <Ionicons name="locate" size={18} color={theme.primary} />
                 </Pressable>
               </View>
-              <View style={styles.locationBar}>
-                <View style={styles.locationDot} />
-                <View style={styles.locationInfo}>
-                  <Text style={styles.locationTitle}>You are here</Text>
-                  <Text style={styles.locationAddress} numberOfLines={1}>
+
+              <View style={[styles.locationBar, { backgroundColor: theme.surfaceAlt }]}>
+                <View style={styles.locationDotWrap}>
+                  <View style={styles.locationDot} />
+                </View>
+                <View style={styles.locationCopy}>
+                  <Text style={[styles.locationTitle, { color: theme.text }]}>You are here</Text>
+                  <Text style={[styles.locationAddress, { color: theme.mutedText }]} numberOfLines={1}>
                     {address ?? 'Fetching address...'}
                   </Text>
                 </View>
-                <Pressable style={styles.locationGoBtn} onPress={() => router.push('/commute')}>
-                  <Ionicons name="navigate" size={14} color="#FFF" />
+                <Pressable style={[styles.locationAction, { backgroundColor: theme.primary }]} onPress={() => router.push('/commute')}>
+                  <Ionicons name="arrow-forward" size={15} color="#FFFFFF" />
                 </Pressable>
               </View>
             </>
           ) : null}
         </View>
 
-        {/* Upcoming trips */}
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { fontSize: isNarrow ? 16 : 18 }]}>Upcoming trips</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Upcoming trips</Text>
+          <Pressable onPress={() => router.push('/(tabs)/trips')}>
+            <Text style={[styles.linkText, { color: theme.primary }]}>See all</Text>
+          </Pressable>
         </View>
 
-        <Pressable
-          style={[styles.tripCard, { borderRadius: cardRadius }]}
-          onPress={() => router.push('/(tabs)/trips')}
-        >
-          <View style={styles.tripCardTop}>
-            <View style={styles.tripEmoji}>
-              <Text style={styles.tripEmojiText}>🇯🇵</Text>
+        {tripCards.map((trip, index) => (
+          <Pressable
+            key={trip.title}
+            style={[
+              styles.tripCard,
+              {
+                backgroundColor: theme.card,
+                borderColor: theme.border,
+                shadowColor: theme.shadow,
+                marginTop: index === 0 ? 0 : 12,
+              },
+            ]}
+            onPress={() => router.push('/(tabs)/trips')}
+          >
+            <View style={styles.tripTopRow}>
+              <View style={[styles.tripBadge, { backgroundColor: theme.primarySoft }]}>
+                <Text style={[styles.tripBadgeText, { color: theme.primary }]}>{trip.status}</Text>
+              </View>
+              <View style={[styles.tripStamp, { backgroundColor: theme.surfaceAlt }]}>
+                <Text style={[styles.tripStampText, { color: theme.text }]}>{trip.emoji}</Text>
+              </View>
             </View>
-            <View style={styles.tripBadgeWrap}>
-              <Text style={styles.tripBadgeText}>Next up</Text>
+            <Text style={[styles.tripTitle, { color: theme.text }]}>{trip.title}</Text>
+            <Text style={[styles.tripDetail, { color: theme.mutedText }]}>{trip.detail}</Text>
+            <View style={styles.tripFooter}>
+              <Text style={[styles.tripFooterText, { color: theme.primary }]}>Open itinerary</Text>
+              <Ionicons name="arrow-forward" size={14} color={theme.primary} />
             </View>
-          </View>
-          <Text style={[styles.tripTitle, { fontSize: isNarrow ? 15 : 17 }]}>Tokyo Spring Escape</Text>
-          <Text style={styles.tripDetail}>5 days · food crawl + city walk</Text>
-          <View style={styles.tripFooter}>
-            <Text style={styles.tripCta}>Open itinerary</Text>
-            <Ionicons name="chevron-forward" size={13} color="#7055C8" />
-          </View>
-        </Pressable>
-
-        <Pressable
-          style={[styles.tripCard, { borderRadius: cardRadius, marginTop: 12 }]}
-          onPress={() => router.push('/(tabs)/trips')}
-        >
-          <View style={styles.tripCardTop}>
-            <View style={styles.tripEmoji}>
-              <Text style={styles.tripEmojiText}>🇰🇷</Text>
-            </View>
-            <View style={styles.tripBadgeWrap}>
-              <Text style={styles.tripBadgeText}>Planning</Text>
-            </View>
-          </View>
-          <Text style={[styles.tripTitle, { fontSize: isNarrow ? 15 : 17 }]}>Seoul Cafe Weekend</Text>
-          <Text style={styles.tripDetail}>12 places saved · 4 notes</Text>
-          <View style={styles.tripFooter}>
-            <Text style={styles.tripCta}>Open itinerary</Text>
-            <Ionicons name="chevron-forward" size={13} color="#7055C8" />
-          </View>
-        </Pressable>
+          </Pressable>
+        ))}
       </ScrollView>
 
       <SideMenu visible={menuVisible} onClose={() => setMenuVisible(false)} />
@@ -250,249 +357,448 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F5F0FF' },
-
+  safeArea: {
+    flex: 1,
+  },
+  backgroundGlowTop: {
+    position: 'absolute',
+    top: -90,
+    right: -40,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    opacity: 0.8,
+  },
+  backgroundGlowBottom: {
+    position: 'absolute',
+    bottom: 140,
+    left: -90,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    opacity: 0.45,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    backgroundColor: '#F5F0FF',
+    paddingTop: 8,
+    paddingBottom: 10,
   },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+  iconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#4C3D81',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 5,
   },
-  headerWordmark: {
-    color: '#1E1640',
-    fontSize: 18,
+  iconButtonText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  wordmarkChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  wordmark: {
+    fontSize: 14,
     fontWeight: '900',
-    letterSpacing: 2.5,
+    letterSpacing: 2.4,
     textTransform: 'lowercase',
   },
-
-  content: { paddingBottom: 28 },
-
+  content: {
+    paddingBottom: 34,
+  },
   greetingRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+    marginTop: 6,
+    marginBottom: 20,
+  },
+  greetingCopy: {
+    flex: 1,
+  },
+  greetingLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  greetingTitle: {
+    marginTop: 8,
+    fontSize: 30,
+    lineHeight: 34,
+    fontWeight: '900',
+  },
+  greetingSubcopy: {
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  avatarShell: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 6,
+    marginTop: 4,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  heroCard: {
+    borderRadius: 30,
+    padding: 22,
+    overflow: 'hidden',
+    marginBottom: 24,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
+    elevation: 10,
+  },
+  heroGlowLarge: {
+    position: 'absolute',
+    top: -45,
+    right: -30,
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    opacity: 0.35,
+  },
+  heroGlowSmall: {
+    position: 'absolute',
+    bottom: -20,
+    left: -10,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    opacity: 0.24,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  heroCopy: {
+    flex: 1,
+  },
+  heroEyebrow: {
+    color: 'rgba(255,255,255,0.74)',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  heroTitle: {
+    marginTop: 10,
+    color: '#FFFFFF',
+    fontSize: 24,
+    lineHeight: 29,
+    fontWeight: '900',
+  },
+  heroSubtitle: {
+    marginTop: 10,
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  heroStatRail: {
+    width: 88,
+    gap: 10,
+  },
+  heroStatCard: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  heroStatCardMuted: {
+    backgroundColor: 'rgba(12,12,12,0.12)',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  heroStatValue: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  heroStatLabel: {
+    marginTop: 4,
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '600',
+  },
+  heroActionRow: {
+    marginTop: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 8,
-    marginBottom: 18,
+    gap: 12,
   },
-  greetingText: { gap: 2 },
-  greetingLabel: { color: '#7B6FA0', fontWeight: '600' },
-  greetingName:  { color: '#1E1640', fontWeight: '900', lineHeight: 34 },
-  avatar: {
-    backgroundColor: '#7055C8',
+  heroPrimaryAction: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { color: '#FFFFFF', fontWeight: '800' },
-
-  // ── Map card ──────────────────────────────────────────
-  mapCard: {
+    gap: 8,
     backgroundColor: '#FFFFFF',
-    marginBottom: 18,
-    overflow: 'hidden',
-    shadowColor: '#4C3D81',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
-    elevation: 4,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
   },
-  mapPlaceholder: {
-    height: 220,
+  heroPrimaryActionText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  heroSecondaryMeta: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
+    gap: 6,
   },
-  mapErrorIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#EDE8FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  mapPlaceholderText: {
-    color: '#5A4E78',
-    fontSize: 14,
+  heroSecondaryMetaText: {
+    color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '700',
   },
-  mapPlaceholderSub: {
-    color: '#A89CC8',
-    fontSize: 12,
-    fontWeight: '600',
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  mapContainer: {
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  sectionHint: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 24,
+  },
+  actionCard: {
+    flex: 1,
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 14,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  actionIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  actionLabel: {
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '800',
+  },
+  actionMeta: {
+    marginTop: 8,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  mapCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 24,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.07,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  mapHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+    gap: 12,
+  },
+  cardEyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  cardTitle: {
+    marginTop: 5,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  inlineButton: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  inlineButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  mapPlaceholder: {
+    minHeight: 220,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  placeholderIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  mapPlaceholderTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  mapPlaceholderCopy: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  mapShell: {
     overflow: 'hidden',
+    borderRadius: 22,
     height: 220,
   },
   map: {
     width: '100%',
     height: '100%',
   },
-  recenterBtn: {
+  recenterButton: {
     position: 'absolute',
     top: 12,
     right: 12,
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
   },
   locationBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 12,
+    borderRadius: 20,
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  locationDotWrap: {
+    width: 28,
+    alignItems: 'center',
   },
   locationDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#4CAF50',
-    borderWidth: 2.5,
-    borderColor: '#C8E6C9',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#38A169',
   },
-  locationInfo: {
+  locationCopy: {
     flex: 1,
   },
   locationTitle: {
-    color: '#1E1640',
     fontSize: 13,
     fontWeight: '800',
   },
   locationAddress: {
-    color: '#7B6FA0',
+    marginTop: 3,
     fontSize: 12,
     fontWeight: '600',
-    marginTop: 1,
   },
-  locationGoBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#7055C8',
+  locationAction: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  // ── Hero card ─────────────────────────────────────────
-  heroCard: {
-    backgroundColor: '#7055C8',
-    padding: 22,
-    marginBottom: 24,
-    overflow: 'hidden',
+  linkText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
-  heroOrbTR: {
-    position: 'absolute',
-    top: -20,
-    right: -20,
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: '#9078E0',
-    opacity: 0.4,
+  tripCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 18,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    elevation: 4,
   },
-  heroOrbBL: {
-    position: 'absolute',
-    bottom: -30,
-    left: -20,
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#5A44A8',
-    opacity: 0.4,
+  tripTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  heroLabel: {
-    color: 'rgba(255,255,255,0.7)',
+  tripBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  tripBadgeText: {
     fontSize: 11,
     fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
   },
-  heroTitle: {
-    color: '#FFFFFF',
+  tripStamp: {
+    minWidth: 44,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  tripStampText: {
+    fontSize: 12,
     fontWeight: '900',
-    lineHeight: 30,
-    marginTop: 8,
+    letterSpacing: 0.6,
   },
-  heroBtn: {
-    marginTop: 18,
-    alignSelf: 'flex-start',
+  tripTitle: {
+    marginTop: 14,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  tripDetail: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  tripFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    marginTop: 16,
   },
-  heroBtnText: { color: '#7055C8', fontSize: 13, fontWeight: '800' },
-
-  // ── Quick actions ─────────────────────────────────────
-  sectionTitle:  { color: '#1E1640', fontWeight: '800', marginBottom: 12 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-
-  actionsRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
-  actionCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    padding: 14,
-    alignItems: 'center',
-    gap: 8,
-    shadowColor: '#4C3D81',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+  tripFooterText: {
+    fontSize: 13,
+    fontWeight: '800',
   },
-  actionIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionLabel: { color: '#3A2E58', fontWeight: '700', textAlign: 'center' },
-
-  // ── Trip cards ────────────────────────────────────────
-  tripCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 18,
-    shadowColor: '#4C3D81',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  tripCardTop:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  tripEmoji:     { width: 40, height: 40, borderRadius: 14, backgroundColor: '#F5F0FF', alignItems: 'center', justifyContent: 'center' },
-  tripEmojiText: { fontSize: 20 },
-  tripBadgeWrap: { backgroundColor: '#EDE8FF', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
-  tripBadgeText: { color: '#6248B0', fontSize: 11, fontWeight: '800' },
-  tripTitle:     { color: '#1E1640', fontWeight: '800', lineHeight: 22 },
-  tripDetail:    { marginTop: 4, color: '#6B5F8A', fontSize: 13, lineHeight: 19 },
-  tripFooter:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 14 },
-  tripCta:       { color: '#7055C8', fontSize: 13, fontWeight: '700' },
 });

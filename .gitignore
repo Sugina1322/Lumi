@@ -46,3 +46,6 @@ yarn-error.*
 
 # Supabase local metadata
 supabase/.temp/
+
+# downloaded transit feeds
+data/transit/gtfs/

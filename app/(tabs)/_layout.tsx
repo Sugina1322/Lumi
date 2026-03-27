@@ -1,68 +1,111 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform, useWindowDimensions } from 'react-native';
+import { Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppTheme } from '../../lib/app-theme';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const TAB_ICONS: Record<string, { outline: IoniconName; filled: IoniconName }> = {
-  index:   { outline: 'home-outline',      filled: 'home'      },
-  trips:   { outline: 'airplane-outline',  filled: 'airplane'  },
-  saved:   { outline: 'heart-outline',     filled: 'heart'     },
+  index: { outline: 'compass-outline', filled: 'compass' },
+  trips: { outline: 'map-outline', filled: 'map' },
+  saved: { outline: 'bookmark-outline', filled: 'bookmark' },
 };
 
 export default function TabsLayout() {
   const { width } = useWindowDimensions();
-  const insets    = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
+  const { theme } = useAppTheme();
 
-  const isSmall   = width < 375;
-  const iconSize  = isSmall ? 21 : 23;
+  const isSmall = width < 375;
+  const iconSize = isSmall ? 20 : 22;
   const labelSize = isSmall ? 10 : 11;
-
-  // Base tab area + system safe area so the bar is never cut off or too tall
-  const tabBarHeight = (isSmall ? 54 : 60) + insets.bottom;
+  const tabBarHeight = (isSmall ? 66 : 72) + insets.bottom;
 
   return (
     <Tabs
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor:   '#7055C8',
-        tabBarInactiveTintColor: '#A89CC8',
+        sceneStyle: { backgroundColor: theme.surface },
+        tabBarShowLabel: true,
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: theme.mutedText,
         tabBarStyle: {
           height: tabBarHeight,
-          paddingTop: 8,
-          // Reserve exactly the safe-area gap at the bottom, no more
-          paddingBottom: insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 8 : 10),
-          backgroundColor: '#FFFFFF',
+          paddingTop: 10,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : Platform.OS === 'android' ? 10 : 12,
+          paddingHorizontal: isSmall ? 12 : 18,
+          backgroundColor: theme.card,
           borderTopWidth: 1,
-          borderTopColor: '#EDE8FF',
-          shadowColor: '#4C3D81',
-          shadowOffset: { width: 0, height: -3 },
-          shadowOpacity: 0.07,
-          shadowRadius: 10,
-          elevation: 20,
+          borderTopColor: theme.border,
+          shadowColor: theme.shadow,
+          shadowOffset: { width: 0, height: -8 },
+          shadowOpacity: theme.id === 'midnight' ? 0.35 : 0.08,
+          shadowRadius: 18,
+          elevation: 24,
         },
         tabBarLabelStyle: {
           fontSize: labelSize,
           fontWeight: '700',
-          marginTop: 2,
+          marginTop: 3,
+          letterSpacing: 0.2,
         },
         tabBarIcon: ({ color, focused }) => {
           const icons = TAB_ICONS[route.name];
           if (!icons) return null;
+
           return (
-            <Ionicons
-              name={focused ? icons.filled : icons.outline}
-              size={iconSize}
-              color={color}
-            />
+            <View
+              style={[
+                styles.iconWrap,
+                {
+                  backgroundColor: focused ? theme.primarySoft : 'transparent',
+                  borderColor: focused ? theme.border : 'transparent',
+                },
+              ]}
+            >
+              <Ionicons
+                name={focused ? icons.filled : icons.outline}
+                size={iconSize}
+                color={color}
+              />
+            </View>
           );
         },
+        tabBarLabel: ({ color, focused, children }) => (
+          <Text
+            style={[
+              styles.label,
+              {
+                color,
+                fontSize: labelSize,
+                opacity: focused ? 1 : theme.id === 'midnight' ? 0.9 : 0.75,
+              },
+            ]}
+          >
+            {children}
+          </Text>
+        ),
       })}
     >
-      <Tabs.Screen name="index"   options={{ title: 'Home'    }} />
-      <Tabs.Screen name="trips"   options={{ title: 'Trips'   }} />
-      <Tabs.Screen name="saved"   options={{ title: 'Saved'   }} />
+      <Tabs.Screen name="index" options={{ title: 'Home' }} />
+      <Tabs.Screen name="trips" options={{ title: 'Trips' }} />
+      <Tabs.Screen name="saved" options={{ title: 'Saved' }} />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  iconWrap: {
+    minWidth: 42,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  label: {
+    fontWeight: '700',
+  },
+});
