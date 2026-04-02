@@ -130,6 +130,7 @@ export function SideMenu({ visible, onClose }: Props) {
       items: [
         { label: 'Profile', icon: 'person-outline', onPress: () => navigate('/profile') },
         { label: 'Settings', icon: 'settings-outline', onPress: () => navigate('/settings') },
+        { label: 'About Lumi', icon: 'information-circle-outline', onPress: () => navigate('/about') },
       ],
     },
   ];

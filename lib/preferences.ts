@@ -10,6 +10,10 @@ import { supabase } from './supabase';
 import { DEFAULT_WEIGHTS, UserWeights } from './route-algorithm';
 
 const LOCAL_KEY = 'lumi_commute_weights';
+const TRAVEL_MODE_KEY = 'lumi_travel_mode';
+
+export type TravelModePreference = 'balanced' | 'fast' | 'calm';
+export const DEFAULT_TRAVEL_MODE: TravelModePreference = 'balanced';
 
 // ── Local storage (fallback / offline) ──
 
@@ -77,4 +81,18 @@ export async function clearWeights(userId?: string | null): Promise<void> {
   if (userId) {
     await saveRemote(userId, { ...DEFAULT_WEIGHTS });
   }
+}
+
+export async function loadTravelMode(): Promise<TravelModePreference> {
+  try {
+    const raw = await SecureStore.getItemAsync(TRAVEL_MODE_KEY);
+    if (raw === 'balanced' || raw === 'fast' || raw === 'calm') {
+      return raw;
+    }
+  } catch {}
+  return DEFAULT_TRAVEL_MODE;
+}
+
+export async function saveTravelMode(mode: TravelModePreference): Promise<void> {
+  await SecureStore.setItemAsync(TRAVEL_MODE_KEY, mode);
 }

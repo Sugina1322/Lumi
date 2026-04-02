@@ -20,7 +20,7 @@ export default function TabsLayout() {
   const isSmall = width < 375;
   const iconSize = isSmall ? 20 : 22;
   const labelSize = isSmall ? 10 : 11;
-  const tabBarHeight = (isSmall ? 66 : 72) + insets.bottom;
+  const tabBarHeight = (isSmall ? 70 : 76) + insets.bottom;
 
   return (
     <Tabs
@@ -32,16 +32,21 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: theme.mutedText,
         tabBarStyle: {
           height: tabBarHeight,
-          paddingTop: 10,
-          paddingBottom: insets.bottom > 0 ? insets.bottom : Platform.OS === 'android' ? 10 : 12,
-          paddingHorizontal: isSmall ? 12 : 18,
+          paddingTop: 12,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : Platform.OS === 'android' ? 12 : 14,
+          paddingHorizontal: isSmall ? 16 : 22,
+          marginHorizontal: 14,
+          marginBottom: 12,
+          borderRadius: 26,
           backgroundColor: theme.card,
-          borderTopWidth: 1,
+          borderWidth: 1,
           borderTopColor: theme.border,
+          borderColor: theme.border,
+          position: 'absolute',
           shadowColor: theme.shadow,
-          shadowOffset: { width: 0, height: -8 },
-          shadowOpacity: theme.id === 'midnight' ? 0.35 : 0.08,
-          shadowRadius: 18,
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: theme.id === 'midnight' ? 0.32 : 0.1,
+          shadowRadius: 22,
           elevation: 24,
         },
         tabBarLabelStyle: {
@@ -97,9 +102,9 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   iconWrap: {
-    minWidth: 42,
-    height: 34,
-    borderRadius: 17,
+    minWidth: 44,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',

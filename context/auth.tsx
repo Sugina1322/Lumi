@@ -4,6 +4,7 @@ import { ExecutionEnvironment } from 'expo-constants';
 import { makeRedirectUri } from 'expo-auth-session';
 import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -111,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       provider: 'google',
       options: {
         redirectTo,
-        skipBrowserRedirect: true,
+        skipBrowserRedirect: Platform.OS !== 'web',
       },
     });
 
@@ -121,6 +122,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!data.url) {
       return { error: 'Google sign-in is not available right now.' };
+    }
+
+    if (Platform.OS === 'web') {
+      return { error: null };
     }
 
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);

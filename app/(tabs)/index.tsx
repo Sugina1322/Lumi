@@ -1,5 +1,8 @@
 import { router } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import { Ionicons } from '@expo/vector-icons';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Pressable,
@@ -10,55 +13,200 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
 import MapView from 'react-native-maps';
 import { useAuth } from '../../context/auth';
 import { SideMenu } from '../../components/side-menu';
+import { ScalePressable } from '../../components/scale-pressable';
 import { useAppTheme } from '../../lib/app-theme';
+import { useAppSettings } from '../../lib/app-settings';
 
 const quickActions = [
-  { label: 'Find route', icon: 'navigate-outline' as const, route: '/commute', accent: '#4D8CFF' },
-  { label: 'Travel budget', icon: 'wallet-outline' as const, route: '/budget', accent: '#2F9D76' },
-  { label: 'Expenses', icon: 'receipt-outline' as const, route: '/expenses', accent: '#E2884A' },
-];
-
-const tripCards = [
   {
-    title: 'Tokyo Spring Escape',
-    detail: '5 days · food crawl + city walk',
-    status: 'Next up',
-    emoji: 'JP',
+    title: 'Commute',
+    detail: 'Plan a route',
+    icon: 'navigate-outline' as const,
+    route: '/commute',
+    accent: '#4D8CFF',
   },
   {
-    title: 'Seoul Cafe Weekend',
-    detail: '12 places saved · 4 notes',
-    status: 'Planning',
-    emoji: 'KR',
+    title: 'Budget',
+    detail: "Today's spend",
+    icon: 'pie-chart-outline' as const,
+    route: '/budget',
+    accent: '#2F9D76',
+  },
+  {
+    title: 'Expenses',
+    detail: 'Receipts',
+    icon: 'receipt-outline' as const,
+    route: '/expenses',
+    accent: '#E2884A',
+  },
+  {
+    title: 'Trips',
+    detail: 'Itinerary',
+    icon: 'airplane-outline' as const,
+    route: '/(tabs)/trips',
+    accent: '#AA7BCF',
   },
 ];
 
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
-}
+const TRIP_SNAPSHOT_KEY = 'lumi_trip_planner_snapshot';
+const LEGACY_TRIP_KEY = 'lumi_trip_planner';
+
+type TripSnapshot = {
+  tripName: string;
+  itemCount: number;
+  completedCount: number;
+};
+
+type BudgetSnapshot = {
+  tripName: string;
+  totalBudget: number;
+  spent: number;
+};
+
+type ExpenseSnapshot = {
+  total: number;
+  todayTotal: number;
+  count: number;
+};
 
 export default function HomeScreen() {
   const { user } = useAuth();
   const { theme } = useAppTheme();
+  const { settings } = useAppSettings();
   const { width } = useWindowDimensions();
+  const tabBarHeight = useBottomTabBarHeight();
   const [menuVisible, setMenuVisible] = useState(false);
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [address, setAddress] = useState<string | null>(null);
+  const [tripSnapshot, setTripSnapshot] = useState<TripSnapshot | null>(null);
+  const [budgetSnapshot, setBudgetSnapshot] = useState<BudgetSnapshot | null>(null);
+  const [expenseSnapshot, setExpenseSnapshot] = useState<ExpenseSnapshot | null>(null);
+  const [savedCount, setSavedCount] = useState(0);
   const mapRef = useRef<MapView>(null);
 
+  const loadHomeSnapshots = useCallback(async () => {
+    const getToday = () =>
+      new Date().toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+
+    const [tripRaw, budgetRaw, expensesRaw, savedRaw] = await Promise.all([
+      SecureStore.getItemAsync(TRIP_SNAPSHOT_KEY),
+      SecureStore.getItemAsync('lumi_travel_budget'),
+      SecureStore.getItemAsync('lumi_expenses'),
+      SecureStore.getItemAsync('lumi_saved_places'),
+    ]);
+
+    if (tripRaw) {
+      try {
+        const data = JSON.parse(tripRaw);
+        setTripSnapshot({
+          tripName: data.tripName || 'My trip',
+          itemCount: data.itemCount ?? 0,
+          completedCount: data.completedCount ?? 0,
+        });
+      } catch {
+        setTripSnapshot(null);
+      }
+    } else {
+      const legacyTripRaw = await SecureStore.getItemAsync(LEGACY_TRIP_KEY);
+      if (legacyTripRaw) {
+        try {
+          const data = JSON.parse(legacyTripRaw);
+          setTripSnapshot({
+            tripName: data.tripName || 'My trip',
+            itemCount: data.itinerary?.length ?? 0,
+            completedCount:
+              data.itinerary?.filter((item: { completed?: boolean }) => item.completed).length ?? 0,
+          });
+        } catch {
+          setTripSnapshot(null);
+        }
+      } else {
+        setTripSnapshot(null);
+      }
+    }
+
+    if (budgetRaw) {
+      try {
+        const data = JSON.parse(budgetRaw);
+        const items = Array.isArray(data.items) ? data.items : [];
+        setBudgetSnapshot({
+          tripName: data.tripName || 'Travel budget',
+          totalBudget: Number.parseFloat(data.totalBudget) || 0,
+          spent: items.reduce(
+            (sum: number, item: { amount?: number }) => sum + (item.amount ?? 0),
+            0,
+          ),
+        });
+      } catch {
+        setBudgetSnapshot(null);
+      }
+    } else {
+      setBudgetSnapshot(null);
+    }
+
+    if (expensesRaw) {
+      try {
+        const data = JSON.parse(expensesRaw) as Array<{ amount?: number; date?: string }>;
+        const allExpenses = Array.isArray(data) ? data : [];
+        const today = getToday();
+        setExpenseSnapshot({
+          total: allExpenses.reduce((sum, item) => sum + (item.amount ?? 0), 0),
+          todayTotal: allExpenses
+            .filter((item) => item.date === today)
+            .reduce((sum, item) => sum + (item.amount ?? 0), 0),
+          count: allExpenses.length,
+        });
+      } catch {
+        setExpenseSnapshot(null);
+      }
+    } else {
+      setExpenseSnapshot(null);
+    }
+
+    if (savedRaw) {
+      try {
+        const data = JSON.parse(savedRaw);
+        setSavedCount(Array.isArray(data) ? data.length : 0);
+      } catch {
+        setSavedCount(0);
+      }
+    } else {
+      setSavedCount(0);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadHomeSnapshots();
+    }, [loadHomeSnapshots]),
+  );
+
   useEffect(() => {
+    if (!settings.location) {
+      setLocation(null);
+      setAddress(null);
+      setLocationError(null);
+      setLocationLoading(false);
+      return;
+    }
+
+    let active = true;
+    setLocationLoading(true);
+
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
+      if (!active) return;
       if (status !== 'granted') {
         setLocationError('Location permission denied');
         setLocationLoading(false);
@@ -66,24 +214,30 @@ export default function HomeScreen() {
       }
 
       const nextLocation = await Location.getCurrentPositionAsync({});
+      if (!active) return;
       setLocation(nextLocation);
+      setLocationError(null);
       setLocationLoading(false);
 
       try {
         const [place] = await Location.reverseGeocodeAsync(nextLocation.coords);
+        if (!active) return;
         if (place) {
           const parts = [place.street, place.district, place.city].filter(Boolean);
           setAddress(parts.join(', ') || 'Unknown location');
         }
       } catch {
-        // Reverse geocoding is best-effort only.
+        // Best-effort reverse geocoding.
       }
     })();
-  }, []);
+
+    return () => {
+      active = false;
+    };
+  }, [settings.location]);
 
   const handleRecenter = () => {
     if (!location || !mapRef.current) return;
-
     mapRef.current.animateToRegion(
       {
         latitude: location.coords.latitude,
@@ -95,180 +249,294 @@ export default function HomeScreen() {
     );
   };
 
-  const isNarrow = width < 375;
-  const horizontalPadding = isNarrow ? 16 : 20;
+  const isCompactScreen = width < 375;
+  const dense = settings.compactCards;
+  const pad = isCompactScreen ? 16 : 20;
   const firstName = user?.email?.split('@')[0] ?? 'traveler';
   const initials = firstName[0]?.toUpperCase() ?? 'L';
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const budgetRemaining = (budgetSnapshot?.totalBudget ?? 0) - (budgetSnapshot?.spent ?? 0);
+
+  const featuredCard =
+    settings.homeFocus === 'budget'
+      ? {
+          label: 'Budget snapshot',
+          title: budgetSnapshot?.tripName?.trim()
+            ? budgetSnapshot.tripName
+            : 'Keep your travel budget in view',
+          route: '/budget' as const,
+          icon: 'wallet-outline' as const,
+          statPrimary: `PHP ${(budgetSnapshot?.spent ?? 0).toLocaleString()}`,
+          statPrimaryLabel: 'spent',
+          statSecondary:
+            budgetSnapshot && budgetSnapshot.totalBudget > 0
+              ? `PHP ${Math.abs(budgetRemaining).toLocaleString()}`
+              : 'Set a budget',
+          statSecondaryLabel:
+            budgetSnapshot && budgetSnapshot.totalBudget > 0
+              ? budgetRemaining >= 0
+                ? 'left'
+                : 'over'
+              : 'to begin',
+          cta: 'Open budget',
+        }
+      : settings.homeFocus === 'commute'
+        ? {
+            label: 'Route planner',
+            title: 'Plan your next move',
+            route: '/commute' as const,
+            icon: 'navigate' as const,
+            statPrimary: tripSnapshot ? `${tripSnapshot.itemCount}` : 'Live',
+            statPrimaryLabel: tripSnapshot ? 'stops planned' : 'routing',
+            statSecondary: settings.location && address ? 'Ready' : 'Manual',
+            statSecondaryLabel: settings.location && address ? 'location' : 'entry',
+            cta: 'Open planner',
+          }
+        : {
+            label: 'Travel overview',
+            title: tripSnapshot?.tripName?.trim()
+              ? tripSnapshot.tripName
+              : 'See your travel board at a glance',
+            route: tripSnapshot ? '/(tabs)/trips' : '/commute',
+            icon: tripSnapshot ? 'map' : 'navigate',
+            statPrimary: `${tripSnapshot?.itemCount ?? 0}`,
+            statPrimaryLabel: 'planned stops',
+            statSecondary: `${savedCount}`,
+            statSecondaryLabel: 'saved places',
+            cta: tripSnapshot ? 'Open trip board' : 'Start planning',
+          };
+
+  const homeQuickActions = [
+    quickActions[0],
+    {
+      ...quickActions[1],
+      detail: budgetSnapshot
+        ? budgetSnapshot.totalBudget > 0
+          ? `PHP ${budgetRemaining.toLocaleString()} left`
+          : 'Set your budget'
+        : "Today's spend",
+    },
+    {
+      ...quickActions[2],
+      detail: expenseSnapshot
+        ? expenseSnapshot.count > 0
+          ? `PHP ${expenseSnapshot.todayTotal.toLocaleString()} today`
+          : 'No expenses yet'
+        : 'Receipts',
+    },
+    {
+      ...quickActions[3],
+      detail: tripSnapshot ? `${tripSnapshot.itemCount} stops planned` : 'Itinerary',
+    },
+  ];
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.surface }]}>
-      <View style={[styles.backgroundGlowTop, { backgroundColor: theme.primarySoft }]} />
-      <View style={[styles.backgroundGlowBottom, { backgroundColor: theme.surfaceAlt }]} />
-
-      <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.root, { backgroundColor: theme.surface }]}>
+      <View style={[styles.topBar, { paddingTop: 8, paddingHorizontal: pad }]}>
         <Pressable
-          style={[
-            styles.iconButton,
-            {
-              backgroundColor: theme.card,
-              borderColor: theme.border,
-              shadowColor: theme.shadow,
-            },
+          style={({ pressed }) => [
+            styles.iconBtn,
+            { backgroundColor: theme.card, borderColor: theme.border },
+            pressed && styles.pressedSmall,
           ]}
           onPress={() => setMenuVisible(true)}
-          hitSlop={6}
+          accessibilityLabel="Open menu"
+          accessibilityRole="button"
         >
           <Ionicons name="menu-outline" size={22} color={theme.text} />
         </Pressable>
 
-        <View style={[styles.wordmarkChip, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.wordmark, { color: theme.text }]}>lumi</Text>
+        <View style={styles.greeting}>
+          <Text style={[styles.greetingLabel, { color: theme.mutedText }]}>{greeting}</Text>
+          <Text style={[styles.greetingName, { color: theme.text }]}>{firstName}</Text>
         </View>
 
         <Pressable
-          style={[
-            styles.iconButton,
-            {
-              backgroundColor: theme.card,
-              borderColor: theme.border,
-              shadowColor: theme.shadow,
-            },
+          style={({ pressed }) => [
+            styles.avatar,
+            { backgroundColor: theme.primary },
+            pressed && styles.pressedSmall,
           ]}
           onPress={() => router.push('/profile')}
-          hitSlop={6}
+          accessibilityLabel="View profile"
+          accessibilityRole="button"
         >
-          <Text style={[styles.iconButtonText, { color: theme.primary }]}>{initials}</Text>
+          <Text style={styles.avatarText}>{initials}</Text>
         </Pressable>
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingHorizontal: horizontalPadding }]}
+        contentContainerStyle={[styles.scroll, { paddingHorizontal: pad, paddingBottom: tabBarHeight + 24 }]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.greetingRow}>
-          <View style={styles.greetingCopy}>
-            <Text style={[styles.greetingLabel, { color: theme.mutedText }]}>{getGreeting()}</Text>
-            <Text style={[styles.greetingTitle, { color: theme.text }]}>
-              Move through the city with less friction.
-            </Text>
-            <Text style={[styles.greetingSubcopy, { color: theme.mutedText }]}>
-              {firstName}, your routes, saved spots, and trip plans are all lined up here.
-            </Text>
-          </View>
-          <View style={[styles.avatarShell, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
-              <Text style={styles.avatarText}>{initials}</Text>
-            </View>
-          </View>
-        </View>
-
-        <Pressable
-          style={[styles.heroCard, { backgroundColor: theme.hero, shadowColor: theme.shadow }]}
-          onPress={() => router.push('/commute')}
+        <ScalePressable
+          containerStyle={styles.heroContainer}
+          style={[styles.hero, dense && styles.heroDense, { backgroundColor: theme.hero }]}
+          onPress={() => router.push(featuredCard.route as never)}
+          accessibilityLabel={featuredCard.cta}
+          accessibilityRole="button"
+          scaleValue={0.97}
         >
-          <View style={[styles.heroGlowLarge, { backgroundColor: theme.heroAlt }]} />
-          <View style={[styles.heroGlowSmall, { backgroundColor: theme.accent }]} />
+          <View style={[styles.heroGlow1, { backgroundColor: theme.heroAlt }]} />
+          <View style={[styles.heroGlow2, { backgroundColor: theme.accent }]} />
 
-          <View style={styles.heroTopRow}>
-            <View style={styles.heroCopy}>
-              <Text style={styles.heroEyebrow}>Today&apos;s focus</Text>
-              <Text style={styles.heroTitle}>Find the fastest commute without giving up comfort.</Text>
-              <Text style={styles.heroSubtitle}>
-                Lumi blends route quality, transfers, walking distance, and cost into one clean recommendation.
-              </Text>
+          <View style={styles.heroTop}>
+            <View style={styles.heroLeft}>
+              <Text style={styles.heroLabel}>{featuredCard.label}</Text>
+              <Text style={styles.heroTitle}>{featuredCard.title}</Text>
             </View>
-            <View style={styles.heroStatRail}>
-              <View style={styles.heroStatCard}>
-                <Text style={styles.heroStatValue}>3</Text>
-                <Text style={styles.heroStatLabel}>Saved trips</Text>
-              </View>
-              <View style={styles.heroStatCardMuted}>
-                <Text style={styles.heroStatValue}>12m</Text>
-                <Text style={styles.heroStatLabel}>To next train</Text>
-              </View>
+            <View style={[styles.heroIconBox, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
+              <Ionicons name={featuredCard.icon as React.ComponentProps<typeof Ionicons>['name']} size={26} color="#fff" />
             </View>
           </View>
 
-          <View style={styles.heroActionRow}>
-            <View style={styles.heroPrimaryAction}>
-              <Ionicons name="navigate" size={14} color={theme.hero} />
-              <Text style={[styles.heroPrimaryActionText, { color: theme.hero }]}>Plan a route</Text>
+          <View style={styles.heroStats}>
+            <View style={[styles.heroStat, { backgroundColor: 'rgba(255,255,255,0.14)' }]}>
+              <Text style={styles.heroStatVal}>{featuredCard.statPrimary}</Text>
+              <Text style={styles.heroStatLbl}>{featuredCard.statPrimaryLabel}</Text>
             </View>
-            <View style={styles.heroSecondaryMeta}>
-              <Ionicons name="sparkles" size={13} color="#FFFFFF" />
-              <Text style={styles.heroSecondaryMetaText}>Adaptive ranking</Text>
+            <View style={[styles.heroStat, { backgroundColor: 'rgba(255,255,255,0.14)' }]}>
+              <Text style={styles.heroStatVal}>{featuredCard.statSecondary}</Text>
+              <Text style={styles.heroStatLbl}>{featuredCard.statSecondaryLabel}</Text>
             </View>
           </View>
-        </Pressable>
 
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick actions</Text>
-          <Text style={[styles.sectionHint, { color: theme.mutedText }]}>Jump back in</Text>
-        </View>
+          <View style={styles.heroCta}>
+            <Text style={[styles.heroCtaText, { color: theme.hero }]}>{featuredCard.cta}</Text>
+            <Ionicons name="arrow-forward" size={14} color={theme.hero} />
+          </View>
+        </ScalePressable>
 
-        <View style={styles.actionsRow}>
-          {quickActions.map((action) => (
-            <Pressable
-              key={action.label}
-              style={[
-                styles.actionCard,
-                {
-                  backgroundColor: theme.card,
-                  borderColor: theme.border,
-                  shadowColor: theme.shadow,
-                },
-              ]}
-              onPress={() => router.push(action.route as never)}
-            >
-              <View style={[styles.actionIconWrap, { backgroundColor: `${action.accent}15` }]}>
-                <Ionicons name={action.icon} size={20} color={action.accent} />
-              </View>
-              <Text style={[styles.actionLabel, { color: theme.text }]}>{action.label}</Text>
-              <Text style={[styles.actionMeta, { color: theme.mutedText }]}>Open</Text>
-            </Pressable>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick actions</Text>
+        <View style={styles.grid}>
+          {[homeQuickActions.slice(0, 2), homeQuickActions.slice(2, 4)].map((row, rowIdx) => (
+            <View key={rowIdx} style={styles.gridRow}>
+              {row.map((action) => (
+                <ScalePressable
+                  key={action.title}
+                  containerStyle={styles.actionContainer}
+                  style={[
+                    styles.actionCard,
+                    dense && styles.actionCardDense,
+                    { backgroundColor: theme.card, borderColor: theme.border },
+                  ]}
+                  onPress={() => router.push(action.route as never)}
+                  accessibilityLabel={action.title}
+                  accessibilityRole="button"
+                >
+                  <View style={[styles.actionIcon, { backgroundColor: `${action.accent}18` }]}>
+                    <Ionicons name={action.icon} size={20} color={action.accent} />
+                  </View>
+                  <Text style={[styles.actionTitle, { color: theme.text }]}>{action.title}</Text>
+                  <Text style={[styles.actionDetail, { color: theme.mutedText }]}>{action.detail}</Text>
+                </ScalePressable>
+              ))}
+            </View>
           ))}
         </View>
 
-        <View
-          style={[
-            styles.mapCard,
-            {
-              backgroundColor: theme.card,
-              borderColor: theme.border,
-              shadowColor: theme.shadow,
-            },
-          ]}
-        >
-          <View style={styles.mapHeader}>
-            <View>
-              <Text style={[styles.cardEyebrow, { color: theme.primary }]}>Live location</Text>
-              <Text style={[styles.cardTitle, { color: theme.text }]}>Your city snapshot</Text>
-            </View>
-            <Pressable
-              style={[styles.inlineButton, { backgroundColor: theme.primarySoft }]}
-              onPress={() => router.push('/commute')}
-            >
-              <Text style={[styles.inlineButtonText, { color: theme.primary }]}>Route</Text>
-            </Pressable>
-          </View>
+        <View style={styles.sectionRow}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>My trip</Text>
+          <Pressable
+            onPress={() => router.push('/(tabs)/trips')}
+            accessibilityLabel="See all trips"
+            accessibilityRole="button"
+          >
+            <Text style={[styles.sectionLink, { color: theme.primary }]}>See all</Text>
+          </Pressable>
+        </View>
 
-          {locationLoading ? (
-            <View style={styles.mapPlaceholder}>
-              <ActivityIndicator size="large" color={theme.primary} />
-              <Text style={[styles.mapPlaceholderTitle, { color: theme.text }]}>Finding your location</Text>
-              <Text style={[styles.mapPlaceholderCopy, { color: theme.mutedText }]}>
-                We&apos;re pulling in your current position for route suggestions.
+        {tripSnapshot ? (
+          <ScalePressable
+            containerStyle={styles.tripContainer}
+            style={[
+              styles.tripCard,
+              dense && styles.tripCardDense,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
+            onPress={() => router.push('/(tabs)/trips')}
+            accessibilityLabel={`Trip: ${tripSnapshot.tripName}`}
+            accessibilityRole="button"
+          >
+            <View style={styles.tripRow}>
+              <View style={[styles.tripIconBox, { backgroundColor: theme.primarySoft }]}>
+                <Ionicons name="map" size={20} color={theme.primary} />
+              </View>
+              <View style={styles.tripInfo}>
+                <Text style={[styles.tripName, { color: theme.text }]} numberOfLines={1}>
+                  {tripSnapshot.tripName}
+                </Text>
+                <Text style={[styles.tripMeta, { color: theme.mutedText }]}>
+                  {tripSnapshot.itemCount} items · {tripSnapshot.completedCount} done
+                </Text>
+              </View>
+              <View style={[styles.tripBadge, { backgroundColor: theme.primarySoft }]}>
+                <Text style={[styles.tripBadgeText, { color: theme.primary }]}>
+                  {tripSnapshot.completedCount > 0 ? 'Active' : 'Planning'}
+                </Text>
+              </View>
+            </View>
+
+            {tripSnapshot.itemCount > 0 && (
+              <View style={[styles.progressBar, { backgroundColor: theme.border }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      backgroundColor: theme.primary,
+                      width: `${Math.round(
+                        (tripSnapshot.completedCount / tripSnapshot.itemCount) * 100,
+                      )}%`,
+                    },
+                  ]}
+                />
+              </View>
+            )}
+          </ScalePressable>
+        ) : (
+          <ScalePressable
+            containerStyle={styles.tripContainer}
+            style={[
+              styles.emptyTrip,
+              dense && styles.emptyTripDense,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
+            onPress={() => router.push('/(tabs)/trips')}
+            accessibilityLabel="Start planning a trip"
+            accessibilityRole="button"
+          >
+            <View style={[styles.emptyTripIcon, { backgroundColor: theme.primarySoft }]}>
+              <Ionicons name="map-outline" size={22} color={theme.primary} />
+            </View>
+            <View style={styles.emptyTripText}>
+              <Text style={[styles.emptyTripTitle, { color: theme.text }]}>No trip yet</Text>
+              <Text style={[styles.emptyTripSub, { color: theme.mutedText }]}>Tap to start planning</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.mutedText} />
+          </ScalePressable>
+        )}
+
+        <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 24 }]}>Location</Text>
+        <View style={[styles.mapCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          {!settings.location ? (
+            <View style={styles.mapEmpty}>
+              <Ionicons name="location-outline" size={24} color={theme.mutedText} />
+              <Text style={[styles.mapEmptyText, { color: theme.mutedText }]}>
+                Location shortcuts are turned off in Settings.
+              </Text>
+            </View>
+          ) : locationLoading ? (
+            <View style={styles.mapEmpty}>
+              <ActivityIndicator color={theme.primary} />
+              <Text style={[styles.mapEmptyText, { color: theme.mutedText }]}>
+                Finding your location...
               </Text>
             </View>
           ) : locationError ? (
-            <View style={styles.mapPlaceholder}>
-              <View style={[styles.placeholderIcon, { backgroundColor: theme.primarySoft }]}>
-                <Ionicons name="location-outline" size={24} color={theme.primary} />
-              </View>
-              <Text style={[styles.mapPlaceholderTitle, { color: theme.text }]}>{locationError}</Text>
-              <Text style={[styles.mapPlaceholderCopy, { color: theme.mutedText }]}>
-                Turn location on to unlock a live map and faster commute suggestions.
-              </Text>
+            <View style={styles.mapEmpty}>
+              <Ionicons name="location-outline" size={24} color={theme.mutedText} />
+              <Text style={[styles.mapEmptyText, { color: theme.mutedText }]}>Location unavailable</Text>
             </View>
           ) : location ? (
             <>
@@ -287,68 +555,43 @@ export default function HomeScreen() {
                   showsCompass={false}
                 />
                 <Pressable
-                  style={[styles.recenterButton, { backgroundColor: theme.card, borderColor: theme.border }]}
+                  style={({ pressed }) => [
+                    styles.recenter,
+                    { backgroundColor: theme.card, borderColor: theme.border },
+                    pressed && styles.pressedSmall,
+                  ]}
                   onPress={handleRecenter}
+                  accessibilityLabel="Recenter map"
+                  accessibilityRole="button"
                 >
                   <Ionicons name="locate" size={18} color={theme.primary} />
                 </Pressable>
               </View>
 
               <View style={[styles.locationBar, { backgroundColor: theme.surfaceAlt }]}>
-                <View style={styles.locationDotWrap}>
-                  <View style={styles.locationDot} />
-                </View>
-                <View style={styles.locationCopy}>
-                  <Text style={[styles.locationTitle, { color: theme.text }]}>You are here</Text>
+                <View style={[styles.locationDot, { backgroundColor: '#38A169' }]} />
+                <View style={styles.locationText}>
+                  <Text style={[styles.locationLabel, { color: theme.text }]}>You are here</Text>
                   <Text style={[styles.locationAddress, { color: theme.mutedText }]} numberOfLines={1}>
                     {address ?? 'Fetching address...'}
                   </Text>
                 </View>
-                <Pressable style={[styles.locationAction, { backgroundColor: theme.primary }]} onPress={() => router.push('/commute')}>
-                  <Ionicons name="arrow-forward" size={15} color="#FFFFFF" />
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.locationArrow,
+                    { backgroundColor: theme.primary },
+                    pressed && styles.pressedSmall,
+                  ]}
+                  onPress={() => router.push('/commute')}
+                  accessibilityLabel="Open route planner"
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="arrow-forward" size={16} color="#fff" />
                 </Pressable>
               </View>
             </>
           ) : null}
         </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Upcoming trips</Text>
-          <Pressable onPress={() => router.push('/(tabs)/trips')}>
-            <Text style={[styles.linkText, { color: theme.primary }]}>See all</Text>
-          </Pressable>
-        </View>
-
-        {tripCards.map((trip, index) => (
-          <Pressable
-            key={trip.title}
-            style={[
-              styles.tripCard,
-              {
-                backgroundColor: theme.card,
-                borderColor: theme.border,
-                shadowColor: theme.shadow,
-                marginTop: index === 0 ? 0 : 12,
-              },
-            ]}
-            onPress={() => router.push('/(tabs)/trips')}
-          >
-            <View style={styles.tripTopRow}>
-              <View style={[styles.tripBadge, { backgroundColor: theme.primarySoft }]}>
-                <Text style={[styles.tripBadgeText, { color: theme.primary }]}>{trip.status}</Text>
-              </View>
-              <View style={[styles.tripStamp, { backgroundColor: theme.surfaceAlt }]}>
-                <Text style={[styles.tripStampText, { color: theme.text }]}>{trip.emoji}</Text>
-              </View>
-            </View>
-            <Text style={[styles.tripTitle, { color: theme.text }]}>{trip.title}</Text>
-            <Text style={[styles.tripDetail, { color: theme.mutedText }]}>{trip.detail}</Text>
-            <View style={styles.tripFooter}>
-              <Text style={[styles.tripFooterText, { color: theme.primary }]}>Open itinerary</Text>
-              <Ionicons name="arrow-forward" size={14} color={theme.primary} />
-            </View>
-          </Pressable>
-        ))}
       </ScrollView>
 
       <SideMenu visible={menuVisible} onClose={() => setMenuVisible(false)} />
@@ -357,350 +600,330 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  backgroundGlowTop: {
-    position: 'absolute',
-    top: -90,
-    right: -40,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    opacity: 0.8,
-  },
-  backgroundGlowBottom: {
-    position: 'absolute',
-    bottom: 140,
-    left: -90,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    opacity: 0.45,
-  },
-  header: {
+  root: { flex: 1 },
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 8,
-    paddingBottom: 10,
+    paddingBottom: 16,
   },
-  iconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+  iconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    elevation: 5,
   },
-  iconButtonText: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  wordmarkChip: {
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  wordmark: {
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 2.4,
-    textTransform: 'lowercase',
-  },
-  content: {
-    paddingBottom: 34,
-  },
-  greetingRow: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'flex-start',
-    marginTop: 6,
-    marginBottom: 20,
-  },
-  greetingCopy: {
-    flex: 1,
+  greeting: {
+    alignItems: 'center',
   },
   greetingLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
-  greetingTitle: {
-    marginTop: 8,
-    fontSize: 30,
-    lineHeight: 34,
-    fontWeight: '900',
-  },
-  greetingSubcopy: {
-    marginTop: 8,
-    fontSize: 14,
-    lineHeight: 21,
-  },
-  avatarShell: {
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 6,
-    marginTop: 4,
+  greetingName: {
+    fontSize: 17,
+    fontWeight: '800',
+    marginTop: 1,
+    textTransform: 'capitalize',
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
   },
-  heroCard: {
-    borderRadius: 30,
-    padding: 22,
-    overflow: 'hidden',
+  scroll: {
+    paddingTop: 4,
+  },
+  heroContainer: {
     marginBottom: 24,
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.24,
-    shadowRadius: 22,
-    elevation: 10,
   },
-  heroGlowLarge: {
+  hero: {
+    borderRadius: 24,
+    padding: 20,
+    overflow: 'hidden',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  heroDense: {
+    padding: 16,
+  },
+  heroGlow1: {
     position: 'absolute',
-    top: -45,
-    right: -30,
-    width: 170,
-    height: 170,
-    borderRadius: 85,
+    top: -40,
+    right: -20,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
     opacity: 0.35,
   },
-  heroGlowSmall: {
+  heroGlow2: {
     position: 'absolute',
-    bottom: -20,
-    left: -10,
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    opacity: 0.24,
+    bottom: -30,
+    left: -20,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    opacity: 0.25,
   },
-  heroTopRow: {
+  heroTop: {
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  heroCopy: {
+  heroLeft: {
     flex: 1,
   },
-  heroEyebrow: {
-    color: 'rgba(255,255,255,0.74)',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
+  heroLabel: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   heroTitle: {
-    marginTop: 10,
-    color: '#FFFFFF',
-    fontSize: 24,
-    lineHeight: 29,
-    fontWeight: '900',
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '800',
+    lineHeight: 28,
+    marginTop: 6,
   },
-  heroSubtitle: {
-    marginTop: 10,
-    color: 'rgba(255,255,255,0.78)',
-    fontSize: 13,
-    lineHeight: 19,
+  heroIconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
   },
-  heroStatRail: {
-    width: 88,
+  heroStats: {
+    flexDirection: 'row',
     gap: 10,
+    marginTop: 16,
   },
-  heroStatCard: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+  heroStat: {
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
-  heroStatCardMuted: {
-    backgroundColor: 'rgba(12,12,12,0.12)',
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  heroStatValue: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  heroStatLabel: {
-    marginTop: 4,
-    color: 'rgba(255,255,255,0.72)',
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '600',
-  },
-  heroActionRow: {
-    marginTop: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  heroPrimaryAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-  },
-  heroPrimaryActionText: {
-    fontSize: 13,
+  heroStatVal: {
+    color: '#fff',
+    fontSize: 20,
     fontWeight: '800',
   },
-  heroSecondaryMeta: {
+  heroStatLbl: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  heroCta: {
+    marginTop: 16,
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    backgroundColor: '#fff',
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
-  heroSecondaryMetaText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+  heroCtaText: {
+    fontSize: 14,
+    fontWeight: '800',
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '800',
+    marginBottom: 12,
   },
-  sectionHint: {
-    fontSize: 12,
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  sectionLink: {
+    fontSize: 14,
     fontWeight: '700',
   },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 10,
+  grid: {
+    gap: 12,
     marginBottom: 24,
   },
-  actionCard: {
-    flex: 1,
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 14,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 4,
+  gridRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  actionIconWrap: {
-    width: 42,
-    height: 42,
+  actionContainer: {
+    flex: 1,
+  },
+  actionCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    minHeight: 112,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  actionCardDense: {
+    minHeight: 96,
+    padding: 14,
+  },
+  actionIcon: {
+    width: 44,
+    height: 44,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
   },
-  actionLabel: {
-    fontSize: 13,
-    lineHeight: 17,
+  actionTitle: {
+    marginTop: 12,
+    fontSize: 16,
     fontWeight: '800',
   },
-  actionMeta: {
-    marginTop: 8,
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+  actionDetail: {
+    marginTop: 3,
+    fontSize: 13,
+    fontWeight: '500',
   },
-  mapCard: {
-    borderRadius: 28,
+  tripContainer: {
+    marginBottom: 0,
+  },
+  tripCard: {
+    borderRadius: 20,
     borderWidth: 1,
     padding: 16,
-    marginBottom: 24,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.07,
-    shadowRadius: 20,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  mapHeader: {
+  tripCardDense: {
+    padding: 14,
+  },
+  tripRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
     gap: 12,
   },
-  cardEyebrow: {
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  cardTitle: {
-    marginTop: 5,
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  inlineButton: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  inlineButtonText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  mapPlaceholder: {
-    minHeight: 220,
+  tripIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 16,
   },
-  placeholderIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
+  tripInfo: {
+    flex: 1,
   },
-  mapPlaceholderTitle: {
-    fontSize: 15,
+  tripName: {
+    fontSize: 16,
     fontWeight: '800',
-    textAlign: 'center',
   },
-  mapPlaceholderCopy: {
-    marginTop: 6,
+  tripMeta: {
     fontSize: 13,
-    lineHeight: 19,
+    fontWeight: '500',
+    marginTop: 3,
+  },
+  tripBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  tripBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  progressBar: {
+    height: 4,
+    borderRadius: 2,
+    marginTop: 14,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  emptyTrip: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyTripDense: {
+    padding: 14,
+  },
+  emptyTripIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTripText: {
+    flex: 1,
+  },
+  emptyTripTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  emptyTripSub: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  mapCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  mapEmpty: {
+    height: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+  },
+  mapEmptyText: {
+    fontSize: 14,
+    fontWeight: '600',
     textAlign: 'center',
   },
   mapShell: {
-    overflow: 'hidden',
-    borderRadius: 22,
-    height: 220,
+    height: 200,
   },
   map: {
     width: '100%',
     height: '100%',
   },
-  recenterButton: {
+  recenter: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    top: 10,
+    right: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -708,97 +931,35 @@ const styles = StyleSheet.create({
   locationBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 20,
-    marginTop: 12,
+    gap: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
-  },
-  locationDotWrap: {
-    width: 28,
-    alignItems: 'center',
   },
   locationDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#38A169',
   },
-  locationCopy: {
+  locationText: {
     flex: 1,
   },
-  locationTitle: {
-    fontSize: 13,
-    fontWeight: '800',
+  locationLabel: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   locationAddress: {
-    marginTop: 3,
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 1,
   },
-  locationAction: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  locationArrow: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  linkText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  tripCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 18,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
-    elevation: 4,
-  },
-  tripTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  tripBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  tripBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  tripStamp: {
-    minWidth: 44,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  tripStampText: {
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-  },
-  tripTitle: {
-    marginTop: 14,
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  tripDetail: {
-    marginTop: 6,
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  tripFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 16,
-  },
-  tripFooterText: {
-    fontSize: 13,
-    fontWeight: '800',
+  pressedSmall: {
+    opacity: 0.7,
   },
 });

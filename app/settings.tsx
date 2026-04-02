@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
   Alert,
   Pressable,
@@ -14,39 +14,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../context/auth';
 import { THEME_OPTIONS, ThemeId, useAppTheme } from '../lib/app-theme';
+import { AppSettings, useAppSettings } from '../lib/app-settings';
 import { clearWeights } from '../lib/preferences';
-
-type AppSettings = {
-  notifications: boolean;
-  location: boolean;
-  reduceMotion: boolean;
-  compactCards: boolean;
-  theme: ThemeId;
-};
-
-const STORAGE_KEY = 'lumi_app_settings';
 const BUDGET_KEY = 'lumi_travel_budget';
 const EXPENSES_KEY = 'lumi_expenses';
-
-const DEFAULT_SETTINGS: AppSettings = {
-  notifications: true,
-  location: true,
-  reduceMotion: false,
-  compactCards: false,
-  theme: 'lilac',
-};
-
-async function loadSettings(): Promise<AppSettings> {
-  try {
-    const raw = await SecureStore.getItemAsync(STORAGE_KEY);
-    if (raw) return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<AppSettings>) };
-  } catch {}
-  return DEFAULT_SETTINGS;
-}
-
-async function saveSettings(settings: AppSettings): Promise<void> {
-  await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(settings));
-}
 
 async function clearTravelData() {
   await Promise.all([
@@ -58,21 +29,12 @@ async function clearTravelData() {
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
   const { theme, setThemeId } = useAppTheme();
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    loadSettings().then((data) => {
-      setSettings(data);
-      setThemeId(data.theme);
-      setLoaded(true);
-    });
-  }, []);
+  const { settings, loaded, setSettings } = useAppSettings();
 
   useEffect(() => {
     if (!loaded) return;
-    saveSettings(settings);
-  }, [settings, loaded]);
+    setThemeId(settings.theme);
+  }, [loaded, setThemeId, settings.theme]);
 
   function toggle(key: keyof AppSettings) {
     setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -81,6 +43,10 @@ export default function SettingsScreen() {
   function setTheme(themeId: ThemeId) {
     setSettings((prev) => ({ ...prev, theme: themeId }));
     setThemeId(themeId);
+  }
+
+  function setHomeFocus(homeFocus: AppSettings['homeFocus']) {
+    setSettings((prev) => ({ ...prev, homeFocus }));
   }
 
   function resetCommuteLearning() {
@@ -126,16 +92,31 @@ export default function SettingsScreen() {
 
   const initials = user?.email?.[0]?.toUpperCase() ?? 'G';
   const email = user?.email ?? 'Browsing as guest';
+  const destructiveColor = theme.id === 'midnight' ? '#FF8FB5' : '#C0396A';
+  const destructiveSurface = theme.id === 'midnight' ? '#2A1A27' : '#FFF0F4';
+  const destructiveBorder = theme.id === 'midnight' ? '#5A3147' : '#F2D9E4';
+
+  if (!loaded) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.surface }]} />
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.surface }]}>
       <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={6}>
-          <Ionicons name="arrow-back" size={22} color="#2F2257" />
+        <Pressable
+          style={({ pressed }) => [styles.backBtn, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }, pressed && styles.pressedSmall]}
+          onPress={() => router.back()}
+          hitSlop={6}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
+          <Ionicons name="arrow-back" size={22} color={theme.text} />
         </Pressable>
         <View style={styles.headerTitleWrap}>
-          <Text style={styles.eyebrow}>Preferences</Text>
-          <Text style={styles.headerTitle}>Settings</Text>
+          <Text style={[styles.eyebrow, { color: theme.primary }]}>Preferences</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Settings</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
@@ -158,19 +139,24 @@ export default function SettingsScreen() {
               return (
                 <Pressable
                   key={option.id}
-                  style={[
+                  style={({ pressed }) => [
                     styles.themeCard,
                     active && styles.themeCardActive,
                     {
                       borderColor: active ? option.primary : theme.border,
-                      backgroundColor: active ? option.primarySoft : '#FFFFFF',
+                      backgroundColor: active ? option.primarySoft : theme.card,
+                      shadowColor: theme.shadow,
                     },
+                    pressed && styles.pressed,
                   ]}
                   onPress={() => setTheme(option.id)}
+                  accessibilityLabel={`${option.label} theme`}
+                  accessibilityRole="button"
+                  android_ripple={{ color: theme.border }}
                 >
                   <View style={[styles.themeSwatch, { backgroundColor: option.primary }]} />
-                  <Text style={[styles.themeLabel, active && styles.themeLabelActive]}>{option.label}</Text>
-                  <Text style={styles.themeCopy}>{option.description}</Text>
+                  <Text style={[styles.themeLabel, { color: active ? theme.text : theme.text }]}>{option.label}</Text>
+                  <Text style={[styles.themeCopy, { color: theme.mutedText }]}>{option.description}</Text>
                 </Pressable>
               );
             })}
@@ -178,101 +164,150 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Travel preferences</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>App behavior</Text>
 
-          <View style={styles.settingCard}>
+          <View style={[styles.settingCard, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}>
+            <Text style={[styles.settingTitle, { color: theme.text }]}>Home focus</Text>
+            <Text style={[styles.settingCopy, { color: theme.mutedText }]}>
+              Choose which part of Lumi should feel most front-and-center when you browse the app.
+            </Text>
+
+            <View style={[styles.segmentedControl, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
+              {[
+                ['overview', 'Overview'],
+                ['commute', 'Commute'],
+                ['budget', 'Budget'],
+              ].map(([value, label]) => {
+                const active = settings.homeFocus === value;
+
+                return (
+                  <Pressable
+                    key={value}
+                    style={({ pressed }) => [
+                      styles.segmentButton,
+                      active && {
+                        backgroundColor: theme.card,
+                        borderColor: theme.border,
+                        shadowColor: theme.shadow,
+                      },
+                      pressed && styles.pressedSmall,
+                    ]}
+                    onPress={() => setHomeFocus(value as AppSettings['homeFocus'])}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.segmentButtonText, { color: active ? theme.text : theme.mutedText }]}>
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={[styles.settingCard, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}>
             <View style={styles.settingRow}>
               <View style={styles.settingTextWrap}>
-                <Text style={styles.settingTitle}>Notifications</Text>
-                <Text style={styles.settingCopy}>Trip reminders, budget nudges, and saved-place updates.</Text>
+                <Text style={[styles.settingTitle, { color: theme.text }]}>Notifications</Text>
+                <Text style={[styles.settingCopy, { color: theme.mutedText }]}>Trip reminders, budget nudges, and saved-place updates.</Text>
               </View>
               <Switch
                 value={settings.notifications}
                 onValueChange={() => toggle('notifications')}
-                trackColor={{ false: '#DDD6F4', true: '#B8A7EE' }}
-                thumbColor={settings.notifications ? '#7055C8' : '#FFFFFF'}
+                trackColor={{ false: theme.border, true: theme.primarySoft }}
+                thumbColor={settings.notifications ? theme.primary : theme.card}
               />
             </View>
           </View>
 
-          <View style={styles.settingCard}>
+          <View style={[styles.settingCard, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}>
             <View style={styles.settingRow}>
               <View style={styles.settingTextWrap}>
-                <Text style={styles.settingTitle}>Location shortcuts</Text>
-                <Text style={styles.settingCopy}>Show location-friendly actions on the home map and commute flow.</Text>
+                <Text style={[styles.settingTitle, { color: theme.text }]}>Location shortcuts</Text>
+                <Text style={[styles.settingCopy, { color: theme.mutedText }]}>Show location-friendly actions on the home map and commute flow.</Text>
               </View>
               <Switch
                 value={settings.location}
                 onValueChange={() => toggle('location')}
-                trackColor={{ false: '#DDD6F4', true: '#B8A7EE' }}
-                thumbColor={settings.location ? '#7055C8' : '#FFFFFF'}
+                trackColor={{ false: theme.border, true: theme.primarySoft }}
+                thumbColor={settings.location ? theme.primary : theme.card}
               />
             </View>
           </View>
 
-          <View style={styles.settingCard}>
+          <View style={[styles.settingCard, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}>
             <View style={styles.settingRow}>
               <View style={styles.settingTextWrap}>
-                <Text style={styles.settingTitle}>Compact cards</Text>
-                <Text style={styles.settingCopy}>Use denser spacing across travel lists and summaries.</Text>
+                <Text style={[styles.settingTitle, { color: theme.text }]}>Compact cards</Text>
+                <Text style={[styles.settingCopy, { color: theme.mutedText }]}>Use denser spacing across travel lists and summaries.</Text>
               </View>
               <Switch
                 value={settings.compactCards}
                 onValueChange={() => toggle('compactCards')}
-                trackColor={{ false: '#DDD6F4', true: '#B8A7EE' }}
-                thumbColor={settings.compactCards ? '#7055C8' : '#FFFFFF'}
+                trackColor={{ false: theme.border, true: theme.primarySoft }}
+                thumbColor={settings.compactCards ? theme.primary : theme.card}
               />
             </View>
           </View>
 
-          <View style={styles.settingCard}>
+          <View style={[styles.settingCard, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}>
             <View style={styles.settingRow}>
               <View style={styles.settingTextWrap}>
-                <Text style={styles.settingTitle}>Reduce motion</Text>
-                <Text style={styles.settingCopy}>Tone down animated transitions for a calmer feel.</Text>
+                <Text style={[styles.settingTitle, { color: theme.text }]}>Reduce motion</Text>
+                <Text style={[styles.settingCopy, { color: theme.mutedText }]}>Tone down animated transitions for a calmer feel.</Text>
               </View>
               <Switch
                 value={settings.reduceMotion}
                 onValueChange={() => toggle('reduceMotion')}
-                trackColor={{ false: '#DDD6F4', true: '#B8A7EE' }}
-                thumbColor={settings.reduceMotion ? '#7055C8' : '#FFFFFF'}
+                trackColor={{ false: theme.border, true: theme.primarySoft }}
+                thumbColor={settings.reduceMotion ? theme.primary : theme.card}
               />
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data controls</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Data controls</Text>
 
-          <Pressable style={styles.actionCard} onPress={resetCommuteLearning}>
-            <View style={styles.actionIcon}>
-              <Ionicons name="sparkles-outline" size={18} color="#7055C8" />
+          <Pressable
+            style={({ pressed }) => [styles.actionCard, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }, pressed && styles.pressed]}
+            onPress={resetCommuteLearning}
+            accessibilityLabel="Reset commute learning"
+            accessibilityRole="button"
+            android_ripple={{ color: theme.border }}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: theme.primarySoft }]}>
+              <Ionicons name="sparkles-outline" size={18} color={theme.primary} />
             </View>
             <View style={styles.actionBody}>
-              <Text style={styles.actionTitle}>Reset commute learning</Text>
-              <Text style={styles.actionCopy}>Clear the route ranking preferences Lumi has learned.</Text>
+              <Text style={[styles.actionTitle, { color: theme.text }]}>Reset commute learning</Text>
+              <Text style={[styles.actionCopy, { color: theme.mutedText }]}>Clear the route ranking preferences Lumi has learned.</Text>
             </View>
-            <Ionicons name="chevron-forward" size={14} color="#C7BBEA" />
+            <Ionicons name="chevron-forward" size={14} color={theme.mutedText} />
           </Pressable>
 
-          <Pressable style={styles.actionCardDanger} onPress={resetAllLocalData}>
-            <View style={styles.actionIconDanger}>
-              <Ionicons name="trash-outline" size={18} color="#C0396A" />
+          <Pressable
+            style={({ pressed }) => [styles.actionCardDanger, { backgroundColor: destructiveSurface, borderColor: destructiveBorder }, pressed && styles.pressed]}
+            onPress={resetAllLocalData}
+            accessibilityLabel="Clear local travel data"
+            accessibilityRole="button"
+          >
+            <View style={[styles.actionIconDanger, { backgroundColor: destructiveBorder }]}>
+              <Ionicons name="trash-outline" size={18} color={destructiveColor} />
             </View>
             <View style={styles.actionBody}>
-              <Text style={[styles.actionTitle, styles.actionTitleDanger]}>Clear local travel data</Text>
-              <Text style={styles.actionCopy}>Remove saved budgets, expenses, and commute memory from this device.</Text>
+              <Text style={[styles.actionTitle, { color: destructiveColor }]}>Clear local travel data</Text>
+              <Text style={[styles.actionCopy, { color: theme.mutedText }]}>Remove saved budgets, expenses, and commute memory from this device.</Text>
             </View>
-            <Ionicons name="chevron-forward" size={14} color="#E5B3C4" />
+            <Ionicons name="chevron-forward" size={14} color={destructiveColor} />
           </Pressable>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Account</Text>
 
-          <Pressable style={styles.signOutBtn} onPress={handleSignOut}>
-            <Ionicons name="log-out-outline" size={18} color="#C0396A" />
-            <Text style={styles.signOutText}>Sign out</Text>
+          <Pressable style={({ pressed }) => [styles.signOutBtn, { backgroundColor: destructiveSurface, borderColor: destructiveBorder }, pressed && styles.pressedSmall]} onPress={handleSignOut} accessibilityLabel="Sign out" accessibilityRole="button">
+            <Ionicons name="log-out-outline" size={18} color={destructiveColor} />
+            <Text style={[styles.signOutText, { color: destructiveColor }]}>Sign out</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -283,7 +318,6 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F7F4FF',
   },
   header: {
     flexDirection: 'row',
@@ -293,13 +327,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#4C3D81',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07,
     shadowRadius: 6,
@@ -309,14 +342,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   eyebrow: {
-    color: '#8A6DE9',
     fontSize: 11,
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 1.2,
   },
   headerTitle: {
-    color: '#1E1640',
     fontSize: 18,
     fontWeight: '900',
     marginTop: 2,
@@ -328,7 +359,6 @@ const styles = StyleSheet.create({
   },
   profileCard: {
     borderRadius: 26,
-    backgroundColor: '#7055C8',
     padding: 22,
     alignItems: 'center',
   },
@@ -372,7 +402,6 @@ const styles = StyleSheet.create({
   },
   themeCard: {
     borderRadius: 22,
-    backgroundColor: '#FFFFFF',
     padding: 16,
     borderWidth: 1,
   },
@@ -389,29 +418,43 @@ const styles = StyleSheet.create({
   },
   themeLabel: {
     marginTop: 10,
-    color: '#2F2644',
     fontSize: 15,
     fontWeight: '900',
   },
-  themeLabelActive: {
-    color: '#1E1640',
-  },
   themeCopy: {
     marginTop: 4,
-    color: '#655C7C',
     fontSize: 13,
     lineHeight: 18,
   },
   settingCard: {
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
     padding: 16,
     marginBottom: 10,
-    shadowColor: '#4C3D81',
+    borderWidth: 1,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 5,
     elevation: 1,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 5,
+    gap: 6,
+    marginTop: 14,
+  },
+  segmentButton: {
+    flex: 1,
+    borderRadius: 14,
+    paddingVertical: 11,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  segmentButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
   settingRow: {
     flexDirection: 'row',
@@ -422,13 +465,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingTitle: {
-    color: '#2F2644',
     fontSize: 15,
     fontWeight: '800',
   },
   settingCopy: {
     marginTop: 4,
-    color: '#655C7C',
     fontSize: 13,
     lineHeight: 18,
   },
@@ -437,10 +478,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
     padding: 16,
     marginBottom: 10,
-    shadowColor: '#4C3D81',
+    borderWidth: 1,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 5,
@@ -451,16 +491,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     borderRadius: 20,
-    backgroundColor: '#FFF7FA',
     padding: 16,
     borderWidth: 1,
-    borderColor: '#F2D9E4',
   },
   actionIcon: {
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#EDE8FF',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -469,7 +506,6 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#FFF0F4',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -478,16 +514,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   actionTitle: {
-    color: '#2F2644',
     fontSize: 15,
     fontWeight: '800',
   },
-  actionTitleDanger: {
-    color: '#C0396A',
-  },
   actionCopy: {
     marginTop: 3,
-    color: '#655C7C',
     fontSize: 13,
     lineHeight: 18,
   },
@@ -497,12 +528,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderRadius: 999,
-    backgroundColor: '#FFF0F4',
+    borderWidth: 1,
     paddingVertical: 15,
   },
   signOutText: {
-    color: '#C0396A',
     fontSize: 14,
     fontWeight: '800',
+  },
+  pressed: {
+    opacity: 0.75,
+    transform: [{ scale: 0.985 }],
+  },
+  pressedSmall: {
+    opacity: 0.7,
   },
 });

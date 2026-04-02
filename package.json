@@ -8,7 +8,12 @@
     "start:tunnel": "set ANDROID_HOME=Z:\\\\__expo_no_adb__&& set ANDROID_SDK_ROOT=Z:\\\\__expo_no_adb__&& .\\node_modules\\.bin\\expo.cmd start --tunnel --max-workers 1",
     "android": ".\\node_modules\\.bin\\expo.cmd start --android --max-workers 1",
     "ios": ".\\node_modules\\.bin\\expo.cmd start --ios --max-workers 1",
-    "web": ".\\node_modules\\.bin\\expo.cmd start --web --max-workers 1"
+    "web": ".\\node_modules\\.bin\\expo.cmd start --web --max-workers 1",
+    "transit:validate": "node scripts/validate-community-routes.mjs",
+    "transit:seed": "npm run transit:validate && node scripts/import-transit-data.mjs",
+    "transit:download-sakay": "node scripts/download-sakay-gtfs.mjs",
+    "transit:seed-sakay": "npm run transit:validate && node scripts/import-transit-data.mjs --gtfs-dir=data/transit/gtfs/sakayph",
+    "transit:apply-seeds": "node scripts/apply-transit-seeds.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -35,6 +40,7 @@
     "react-native-maps": "1.20.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
+    "react-native-svg": "15.12.1",
     "react-native-url-polyfill": "^3.0.0",
     "react-native-web": "~0.21.0"
   },

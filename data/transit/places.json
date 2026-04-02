@@ -1,0 +1,72 @@
+[
+  {
+    "slug": "gate-5-karangalan",
+    "name": "Gate 5 Karangalan",
+    "aliases": ["Karangalan", "Gate 5", "Karangalan Gate 5"],
+    "lat": 14.6148,
+    "lng": 121.1018,
+    "zone": "pasig",
+    "corridor": "ortigas-avenue",
+    "source": "community"
+  },
+  {
+    "slug": "sta-lucia-east-grand-mall",
+    "name": "Sta. Lucia East Grand Mall",
+    "aliases": ["Sta Lucia", "Sta. Lucia"],
+    "lat": 14.6191,
+    "lng": 121.1017,
+    "zone": "marikina",
+    "corridor": "marcos-highway",
+    "source": "community"
+  },
+  {
+    "slug": "ligaya",
+    "name": "Ligaya",
+    "aliases": ["Ligaya Marikina"],
+    "lat": 14.6265,
+    "lng": 121.0916,
+    "zone": "marikina",
+    "corridor": "marcos-highway",
+    "source": "community"
+  },
+  {
+    "slug": "santolan-pasig",
+    "name": "Santolan Pasig",
+    "aliases": ["Santolan", "Santolan Area"],
+    "lat": 14.6134,
+    "lng": 121.0907,
+    "zone": "pasig",
+    "corridor": "marcos-highway",
+    "source": "community"
+  },
+  {
+    "slug": "rosario-pasig",
+    "name": "Rosario Pasig",
+    "aliases": ["Rosario"],
+    "lat": 14.5885,
+    "lng": 121.0837,
+    "zone": "pasig",
+    "corridor": "ortigas-avenue",
+    "source": "community"
+  },
+  {
+    "slug": "eastwood-city",
+    "name": "Eastwood City",
+    "aliases": [],
+    "lat": 14.6108,
+    "lng": 121.08,
+    "zone": "pasig",
+    "corridor": "c5",
+    "source": "community"
+  },
+  {
+    "slug": "manggahan-pasig",
+    "name": "Manggahan Pasig",
+    "aliases": ["Manggahan"],
+    "lat": 14.6052,
+    "lng": 121.0932,
+    "zone": "pasig",
+    "corridor": "ortigas-avenue",
+    "source": "community"
+  }
+]

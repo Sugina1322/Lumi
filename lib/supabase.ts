@@ -9,16 +9,28 @@ const ExpoSecureStoreAdapter = {
   removeItem: (key: string) => SecureStore.deleteItemAsync(key),
 };
 
+const WebStorageAdapter = {
+  getItem: (key: string) => Promise.resolve(globalThis.localStorage?.getItem(key) ?? null),
+  setItem: (key: string, value: string) => {
+    globalThis.localStorage?.setItem(key, value);
+    return Promise.resolve();
+  },
+  removeItem: (key: string) => {
+    globalThis.localStorage?.removeItem(key);
+    return Promise.resolve();
+  },
+};
+
 const SUPABASE_URL = 'https://qmhovauulfnbrzlpasys.supabase.co';
 const SUPABASE_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtaG92YXV1bGZuYnJ6bHBhc3lzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMzYxNDMsImV4cCI6MjA4OTkxMjE0M30.sYCQhDHkdn5_qKmzWWO7HLLRqR2sw1Jvek-_5sBeSmE';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    storage: ExpoSecureStoreAdapter,
+    storage: Platform.OS === 'web' ? WebStorageAdapter : ExpoSecureStoreAdapter,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: Platform.OS === 'web',
     flowType: 'pkce',
   },
 });

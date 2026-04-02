@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,7 +25,13 @@ import {
   UserWeights,
 } from '../lib/route-algorithm';
 import { fetchRoutes, KNOWN_LOCATIONS, RouteSource } from '../lib/transit-provider';
-import { loadWeights, saveWeights } from '../lib/preferences';
+import {
+  DEFAULT_TRAVEL_MODE,
+  loadTravelMode,
+  loadWeights,
+  saveWeights,
+  TravelModePreference,
+} from '../lib/preferences';
 import { useAuth } from '../context/auth';
 import { useAppTheme } from '../lib/app-theme';
 
@@ -41,6 +49,7 @@ export default function CommuteScreen() {
   const [showToSuggestions, setShowToSuggestions] = useState(false);
   const [routeSource, setRouteSource] = useState<RouteSource>('fallback');
   const [routeMessage, setRouteMessage] = useState<string | null>(null);
+  const [travelMode, setTravelMode] = useState<TravelModePreference>(DEFAULT_TRAVEL_MODE);
 
   const weightsRef = useRef<UserWeights>({ ...DEFAULT_WEIGHTS });
   const rawRoutesRef = useRef<RouteOption[]>([]);
@@ -51,6 +60,39 @@ export default function CommuteScreen() {
       weightsRef.current = nextWeights;
     });
   }, [user?.id]);
+
+  useEffect(() => {
+    loadTravelMode().then(setTravelMode);
+  }, []);
+
+  const scoreRoutesForMode = useCallback((nextRoutes: RouteOption[], baseWeights: UserWeights, mode: TravelModePreference) => {
+    const modeWeights: Record<TravelModePreference, UserWeights> = {
+      balanced: baseWeights,
+      fast: {
+        time: 0.42,
+        cost: 0.16,
+        transfers: 0.18,
+        walking: 0.08,
+        waiting: 0.11,
+        comfort: 0.05,
+      },
+      calm: {
+        time: 0.18,
+        cost: 0.14,
+        transfers: 0.22,
+        walking: 0.20,
+        waiting: 0.09,
+        comfort: 0.17,
+      },
+    };
+
+    return scoreRoutes(nextRoutes, modeWeights[mode]);
+  }, []);
+
+  useEffect(() => {
+    if (rawRoutesRef.current.length === 0) return;
+    setRoutes(scoreRoutesForMode(rawRoutesRef.current, weightsRef.current, travelMode));
+  }, [scoreRoutesForMode, travelMode]);
 
   const filteredLocations = (query: string) =>
     KNOWN_LOCATIONS.filter((location) => {
@@ -89,15 +131,15 @@ export default function CommuteScreen() {
     setRouteMessage(null);
 
     try {
-      const result = await fetchRoutes(from.trim(), to.trim());
+      const result = await fetchRoutes(from.trim(), to.trim(), { travelModePreference: travelMode });
       rawRoutesRef.current = result.routes;
       setRouteSource(result.source);
       setRouteMessage(result.message ?? null);
-      setRoutes(scoreRoutes(result.routes, weightsRef.current));
+      setRoutes(scoreRoutesForMode(result.routes, weightsRef.current, travelMode));
     } finally {
       setLoading(false);
     }
-  }, [from, to]);
+  }, [from, to, scoreRoutesForMode, travelMode]);
 
   const handleSelectRoute = useCallback(
     (route: RouteOption) => {
@@ -254,6 +296,10 @@ export default function CommuteScreen() {
     routeSource === 'live' ? '#2E7D32' : routeSource === 'database' ? '#0F766E' : theme.primary;
 
   return (
+    <KeyboardAvoidingView
+      style={styles.safeArea}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.surface }]}>
       <View style={[styles.backgroundGlow, { backgroundColor: theme.primarySoft }]} />
 
@@ -280,7 +326,7 @@ export default function CommuteScreen() {
       >
         <Text style={[styles.title, { color: theme.text }]}>Where are you headed?</Text>
         <Text style={[styles.subtitle, { color: theme.mutedText }]}>
-          Find the best route based on your preferences. Live transit data is used when available.
+          Find the best route based on your preferences. Current travel mode: {travelMode[0].toUpperCase() + travelMode.slice(1)}.
         </Text>
 
         <View style={[styles.modeBanner, modeBannerStyle]}>
@@ -481,6 +527,7 @@ export default function CommuteScreen() {
         ) : null}
       </ScrollView>
     </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 

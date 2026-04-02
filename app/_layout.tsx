@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../context/auth';
 import { AppThemeProvider, useAppTheme } from '../lib/app-theme';
+import { AppSettingsProvider, useAppSettings } from '../lib/app-settings';
 
 function AuthGate() {
   const { session, loading } = useAuth();
@@ -34,6 +35,7 @@ function AuthGate() {
 
 function ThemedStack() {
   const { theme } = useAppTheme();
+  const { settings } = useAppSettings();
 
   return (
     <>
@@ -42,7 +44,7 @@ function ThemedStack() {
       <Stack
         screenOptions={{
           headerShown: false,
-          animation: 'fade',
+          animation: settings.reduceMotion ? 'none' : 'fade',
           contentStyle: { backgroundColor: theme.surface },
         }}
       />
@@ -54,9 +56,11 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <AppThemeProvider>
-        <SafeAreaProvider>
-          <ThemedStack />
-        </SafeAreaProvider>
+        <AppSettingsProvider>
+          <SafeAreaProvider>
+            <ThemedStack />
+          </SafeAreaProvider>
+        </AppSettingsProvider>
       </AppThemeProvider>
     </AuthProvider>
   );

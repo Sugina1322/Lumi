@@ -9,11 +9,16 @@ import { RouteOption, TransportMode } from './route-algorithm';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { supabase } from './supabase';
+import { buildPlaceSlugCandidates, fetchDatabaseRoutes } from './transit-database';
+import { TravelModePreference } from './preferences';
 
 export interface Location {
   name: string;
   lat: number;
   lng: number;
+  aliases?: string[];
+  zone?: 'quezon-city' | 'cubao' | 'marikina' | 'pasig' | 'ortigas' | 'makati' | 'manila' | 'south';
+  corridor?: 'marcos-highway' | 'ortigas-avenue' | 'c5' | 'commonwealth' | 'edsa';
 }
 
 export const KNOWN_LOCATIONS: Location[] = [
@@ -21,12 +26,51 @@ export const KNOWN_LOCATIONS: Location[] = [
   { name: 'Makati CBD', lat: 14.5547, lng: 121.0244 },
   { name: 'BGC High Street', lat: 14.5500, lng: 121.0509 },
   { name: 'Quezon City Hall', lat: 14.6328, lng: 121.0451 },
+  { name: 'UP Diliman', lat: 14.6537, lng: 121.0684, zone: 'quezon-city', corridor: 'commonwealth' },
+  { name: 'Ateneo de Manila University', lat: 14.6398, lng: 121.0770, aliases: ['Ateneo'], zone: 'quezon-city', corridor: 'marcos-highway' },
+  { name: 'Miriam College', lat: 14.6382, lng: 121.0765, zone: 'quezon-city', corridor: 'marcos-highway' },
+  { name: 'Trinoma', lat: 14.6535, lng: 121.0330, zone: 'quezon-city', corridor: 'edsa' },
+  { name: 'Quezon Memorial Circle', lat: 14.6507, lng: 121.0494, aliases: ['QC Circle'], zone: 'quezon-city', corridor: 'commonwealth' },
+  { name: 'Commonwealth Market', lat: 14.7001, lng: 121.0878, zone: 'quezon-city', corridor: 'commonwealth' },
+  { name: 'Ever Gotesco Commonwealth', lat: 14.6765, lng: 121.0858, zone: 'quezon-city', corridor: 'commonwealth' },
+  { name: 'Fairview Terraces', lat: 14.7349, lng: 121.0584, zone: 'quezon-city', corridor: 'commonwealth' },
+  { name: 'SM Fairview', lat: 14.7342, lng: 121.0561, zone: 'quezon-city', corridor: 'commonwealth' },
+  { name: 'Cubao Gateway', lat: 14.6194, lng: 121.0531, aliases: ['Gateway Cubao', 'Gateway'], zone: 'cubao', corridor: 'edsa' },
+  { name: 'Ali Mall Cubao', lat: 14.6206, lng: 121.0539, aliases: ['Ali Mall'], zone: 'cubao', corridor: 'edsa' },
+  { name: 'East Avenue Medical Center', lat: 14.6378, lng: 121.0479, aliases: ['East Ave Medical Center', 'EAMC'], zone: 'quezon-city', corridor: 'edsa' },
+  { name: 'St. Luke\'s Medical Center Quezon City', lat: 14.6248, lng: 121.0405, aliases: ['St Lukes QC', 'St. Lukes QC'], zone: 'quezon-city', corridor: 'edsa' },
+  { name: 'Araneta City Cubao', lat: 14.6213, lng: 121.0537, aliases: ['Araneta Cubao', 'Cubao'], zone: 'cubao', corridor: 'edsa' },
   { name: 'Manila City Hall', lat: 14.5896, lng: 120.9842 },
   { name: 'MOA Complex', lat: 14.5351, lng: 120.9832 },
-  { name: 'Ortigas Center', lat: 14.5880, lng: 121.0614 },
-  { name: 'Cubao Araneta', lat: 14.6218, lng: 121.0530 },
+  { name: 'Ortigas Center', lat: 14.5880, lng: 121.0614, aliases: ['Ortigas'], zone: 'ortigas', corridor: 'ortigas-avenue' },
+  { name: 'SM Megamall', lat: 14.5849, lng: 121.0567, aliases: ['Megamall'], zone: 'ortigas', corridor: 'ortigas-avenue' },
+  { name: 'Robinsons Galleria Ortigas', lat: 14.5895, lng: 121.0597, aliases: ['Rob Galleria', 'Galleria Ortigas'], zone: 'ortigas', corridor: 'ortigas-avenue' },
+  { name: 'Shangri-La Plaza', lat: 14.5812, lng: 121.0536, aliases: ['Shang', 'Shang Plaza'], zone: 'ortigas', corridor: 'edsa' },
+  { name: 'Capitol Commons', lat: 14.5720, lng: 121.0636, zone: 'pasig', corridor: 'ortigas-avenue' },
+  { name: 'Tiendesitas', lat: 14.5768, lng: 121.0781, zone: 'pasig', corridor: 'c5' },
+  { name: 'Arcovia City', lat: 14.5788, lng: 121.0805, zone: 'pasig', corridor: 'c5' },
+  { name: 'Pasig City Hall', lat: 14.5614, lng: 121.0781, aliases: ['Pasig Palengke', 'Pasig Hall'], zone: 'pasig', corridor: 'ortigas-avenue' },
+  { name: 'Ayala Malls The 30th', lat: 14.5842, lng: 121.0634, aliases: ['The 30th'], zone: 'ortigas', corridor: 'ortigas-avenue' },
+  { name: 'PhilSports Arena', lat: 14.5762, lng: 121.0662, aliases: ['Ultra'], zone: 'pasig', corridor: 'ortigas-avenue' },
+  { name: 'Rosario Pasig', lat: 14.5885, lng: 121.0837, aliases: ['Rosario'], zone: 'pasig', corridor: 'ortigas-avenue' },
+  { name: 'Jennys Avenue', lat: 14.5765, lng: 121.0846, aliases: ['Jenny\'s', 'Jennys'], zone: 'pasig', corridor: 'c5' },
+  { name: 'Manggahan Pasig', lat: 14.6052, lng: 121.0932, aliases: ['Manggahan'], zone: 'pasig', corridor: 'ortigas-avenue' },
+  { name: 'Napico Manggahan', lat: 14.6075, lng: 121.0966, aliases: ['Napico', 'Napico Pasig'], zone: 'pasig', corridor: 'ortigas-avenue' },
+  { name: 'Gate 5 Karangalan', lat: 14.6148, lng: 121.1018, aliases: ['Karangalan', 'Gate 5', 'Karangalan Gate 5'], zone: 'pasig', corridor: 'ortigas-avenue' },
+  { name: 'Cainta Junction', lat: 14.6046, lng: 121.1057, aliases: ['Junction'], zone: 'pasig', corridor: 'ortigas-avenue' },
+  { name: 'Cubao Araneta', lat: 14.6218, lng: 121.0530, aliases: ['Araneta Center Cubao'], zone: 'cubao', corridor: 'edsa' },
   { name: 'Alabang Town Center', lat: 14.4235, lng: 121.0479 },
-  { name: 'Eastwood City', lat: 14.6108, lng: 121.0800 },
+  { name: 'Eastwood City', lat: 14.6108, lng: 121.0800, zone: 'pasig', corridor: 'c5' },
+  { name: 'Marikina Sports Center', lat: 14.6397, lng: 121.1020, aliases: ['Marikina Sports'], zone: 'marikina', corridor: 'marcos-highway' },
+  { name: 'Marikina River Park', lat: 14.6405, lng: 121.0978, aliases: ['River Park'], zone: 'marikina', corridor: 'marcos-highway' },
+  { name: 'SM City Marikina', lat: 14.6325, lng: 121.0943, aliases: ['SM Marikina'], zone: 'marikina', corridor: 'marcos-highway' },
+  { name: 'Riverbanks Center', lat: 14.6356, lng: 121.0995, aliases: ['Riverbanks'], zone: 'marikina', corridor: 'marcos-highway' },
+  { name: 'Marikina Public Market', lat: 14.6500, lng: 121.1027, aliases: ['Marikina Bayan', 'Bayan Marikina'], zone: 'marikina', corridor: 'marcos-highway' },
+  { name: 'Ayala Malls Marikina', lat: 14.6297, lng: 121.1019, aliases: ['Ayala Marikina'], zone: 'marikina', corridor: 'marcos-highway' },
+  { name: 'Ligaya', lat: 14.6265, lng: 121.0916, aliases: ['Ligaya Marikina'], zone: 'marikina', corridor: 'marcos-highway' },
+  { name: 'Santolan Pasig', lat: 14.6134, lng: 121.0907, aliases: ['Santolan Area'], zone: 'pasig', corridor: 'marcos-highway' },
+  { name: 'Sta. Lucia East Grand Mall', lat: 14.6191, lng: 121.1017, aliases: ['Sta Lucia', 'Sta. Lucia'], zone: 'marikina', corridor: 'marcos-highway' },
+  { name: 'LRT-2 Santolan Station', lat: 14.6223, lng: 121.0864, aliases: ['Santolan Station', 'Santolan LRT'], zone: 'marikina', corridor: 'marcos-highway' },
   { name: 'Shibuya, Tokyo', lat: 35.6580, lng: 139.7016 },
   { name: 'Myeongdong, Seoul', lat: 37.5636, lng: 126.9869 },
   { name: 'Orchard Rd, Singapore', lat: 1.3048, lng: 103.8318 },
@@ -114,7 +158,7 @@ type GoogleFare = {
   nanos?: number;
 };
 
-export type RouteSource = 'live' | 'fallback';
+export type RouteSource = 'database' | 'live' | 'fallback';
 
 export type RouteFetchResult = {
   routes: RouteOption[];
@@ -132,11 +176,26 @@ function normalize(text: string) {
   return text.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+function toWaypoint(query: string, location?: Location | null) {
+  if (location) {
+    return {
+      location: {
+        latLng: {
+          latitude: location.lat,
+          longitude: location.lng,
+        },
+      },
+    };
+  }
+
+  return { address: query };
+}
+
 function findKnownLocation(query: string): Location | null {
   const q = normalize(query);
   return KNOWN_LOCATIONS.find((loc) => {
-    const name = normalize(loc.name);
-    return name === q || name.includes(q) || q.includes(name);
+    const terms = [loc.name, ...(loc.aliases ?? [])].map(normalize);
+    return terms.some((term) => term === q || term.includes(q) || q.includes(term));
   }) ?? null;
 }
 
@@ -253,14 +312,15 @@ function buildRoute(
   } satisfies RouteOption;
 }
 
-function buildTransitSummary(steps: GoogleStep[]) {
+function buildRouteSummaryFromSteps(steps: ReturnType<typeof buildStep>[]) {
   const labels: string[] = [];
   for (const step of steps) {
-    if (!step.transitDetails) continue;
-    const label = transitLabel(step);
+    if (step.mode === 'walk') continue;
+    const label = step.lineName?.trim()
+      || (step.mode === 'jeepney' ? 'Jeepney' : step.mode === 'tricycle' ? 'Tricycle' : step.mode === 'bus' ? 'Bus' : step.mode === 'train' ? 'Train' : step.mode);
     if (!labels.includes(label)) labels.push(label);
   }
-  if (labels.length === 0) return 'Live transit route';
+  if (labels.length === 0) return 'Transit route';
   return labels.join(' + ');
 }
 
@@ -320,7 +380,7 @@ function buildTransitRoute(route: GoogleRoute, from: string, to: string, index: 
   );
 
   let fareApplied = false;
-  const pricedSteps = parsedSteps.map((step) => {
+  const fullyPricedSteps = parsedSteps.map((step) => {
     if (step.mode !== 'walk' && !fareApplied) {
       fareApplied = true;
       return { ...step, cost: totalCost };
@@ -329,52 +389,13 @@ function buildTransitRoute(route: GoogleRoute, from: string, to: string, index: 
   });
 
   return buildRoute(
-    buildTransitSummary(steps),
-    pricedSteps,
+    buildRouteSummaryFromSteps(fullyPricedSteps),
+    fullyPricedSteps,
     comfort,
     {
       duration: totalDuration,
       cost: totalCost,
       waitMinutes,
-    },
-  );
-}
-
-function buildDriveRoute(route: GoogleRoute, from: string, to: string): RouteOption | null {
-  const leg = route.legs?.[0];
-  const totalDuration = secondsToMinutes(route.duration ?? leg?.duration);
-  const totalDistance = Math.max(0, Math.round(route.distanceMeters ?? leg?.distanceMeters ?? 0));
-  if (!totalDuration || !totalDistance) return null;
-
-  const durationWithPickup = Math.max(3, totalDuration + 4);
-  const fare = estimateRideFare(totalDistance, durationWithPickup);
-
-  return buildRoute(
-    `Rideshare to ${to}`,
-    [
-      buildStep(
-        'walk',
-        from,
-        'Pickup point',
-        'Walk to pickup point',
-        2,
-        Math.min(180, Math.round(totalDistance * 0.02)),
-        0,
-      ),
-      buildStep(
-        'rideshare',
-        'Pickup point',
-        to,
-        `Ride to ${to}`,
-        durationWithPickup,
-        totalDistance,
-        fare,
-      ),
-    ],
-    0.88,
-    {
-      duration: durationWithPickup,
-      cost: fare,
     },
   );
 }
@@ -412,11 +433,6 @@ function estimateTransitFare(distanceMeters: number, transitStops: number) {
   return Math.max(13, Math.round(10 + km * 4 + transitStops * 6));
 }
 
-function estimateRideFare(distanceMeters: number, durationMinutes: number) {
-  const km = distanceMeters / 1000;
-  return Math.max(60, Math.round(45 + km * 18 + durationMinutes * 1.5));
-}
-
 async function fetchGoogleRoutes(
   from: string,
   to: string,
@@ -424,13 +440,15 @@ async function fetchGoogleRoutes(
   options?: {
     computeAlternativeRoutes?: boolean;
     transitRoutingPreference?: 'LESS_WALKING' | 'FEWER_TRANSFERS';
+    originLocation?: Location | null;
+    destinationLocation?: Location | null;
   },
 ): Promise<{ data: GoogleRoutesResponse | null; error?: string }> {
   if (!GOOGLE_ROUTES_API_KEY) return { data: null, error: 'Missing Google Routes API key.' };
 
   const body: Record<string, unknown> = {
-    origin: { address: from },
-    destination: { address: to },
+    origin: toWaypoint(from, options?.originLocation),
+    destination: toWaypoint(to, options?.destinationLocation),
     travelMode,
     languageCode: 'en',
     units: 'METRIC',
@@ -482,6 +500,8 @@ async function fetchGoogleRoutesViaProxy(
   options?: {
     computeAlternativeRoutes?: boolean;
     transitRoutingPreference?: 'LESS_WALKING' | 'FEWER_TRANSFERS';
+    originLocation?: Location | null;
+    destinationLocation?: Location | null;
   },
 ): Promise<{ data: GoogleRoutesResponse | null; error?: string }> {
   const { data, error } = await supabase.functions.invoke('google-routes', {
@@ -490,6 +510,12 @@ async function fetchGoogleRoutesViaProxy(
       to,
       travelMode,
       options,
+      originLatLng: options?.originLocation
+        ? { latitude: options.originLocation.lat, longitude: options.originLocation.lng }
+        : undefined,
+      destinationLatLng: options?.destinationLocation
+        ? { latitude: options.destinationLocation.lat, longitude: options.destinationLocation.lng }
+        : undefined,
       fieldMask: fieldMaskForMode(travelMode),
     },
   });
@@ -521,21 +547,8 @@ function buildFallbackRoutes(from: string, to: string): RouteOption[] {
   const urbanMinutes = Math.max(8, Math.round(distanceMeters / 280));
   const walkMinutes = Math.max(20, Math.round(distanceMeters / 75));
   const transitMinutes = Math.max(18, Math.round(distanceMeters / 210));
-  const taxiMinutes = Math.max(10, Math.round(distanceMeters / 260));
 
   const routes: RouteOption[] = [
-    buildRoute(
-      `Rideshare to ${to}`,
-      [
-        buildStep('walk', from, 'Pickup point', 'Walk to pickup point', 3, Math.min(220, Math.round(distanceMeters * 0.02)), 0),
-        buildStep('rideshare', 'Pickup point', to, `Ride to ${to}`, taxiMinutes, Math.round(distanceMeters), estimateRideFare(Math.round(distanceMeters), taxiMinutes)),
-      ],
-      0.88,
-      {
-        duration: taxiMinutes + 2,
-        cost: estimateRideFare(Math.round(distanceMeters), taxiMinutes),
-      },
-    ),
     buildRoute(
       'Transit mix',
       [
@@ -583,35 +596,85 @@ export function isLiveTransitEnabled() {
   return true;
 }
 
-export async function fetchRoutes(from: string, to: string): Promise<RouteFetchResult> {
+function getTransitRoutingPreference(mode: TravelModePreference) {
+  if (mode === 'fast') return 'FEWER_TRANSFERS' as const;
+  return 'LESS_WALKING' as const;
+}
+
+export async function fetchRoutes(
+  from: string,
+  to: string,
+  options?: { travelModePreference?: TravelModePreference },
+): Promise<RouteFetchResult> {
   const origin = from.trim();
   const destination = to.trim();
   if (!origin || !destination) return { routes: [], source: 'fallback', message: 'Enter both an origin and destination.' };
+  const travelModePreference = options?.travelModePreference ?? 'balanced';
+  const originLocation = findKnownLocation(origin);
+  const destinationLocation = findKnownLocation(destination);
+  const originCandidates = buildPlaceSlugCandidates(originLocation?.name ?? origin, originLocation?.aliases);
+  const destinationCandidates = buildPlaceSlugCandidates(destinationLocation?.name ?? destination, destinationLocation?.aliases);
 
   idCounter = 0;
 
   try {
-    const [transitResponse, driveResponse, walkResponse] = await Promise.all([
+    const databaseResult = await fetchDatabaseRoutes(originCandidates, destinationCandidates, {
+      originPlace: originLocation
+        ? {
+            name: originLocation.name,
+            lat: originLocation.lat,
+            lng: originLocation.lng,
+            aliases: originLocation.aliases,
+          }
+        : null,
+      destinationPlace: destinationLocation
+        ? {
+            name: destinationLocation.name,
+            lat: destinationLocation.lat,
+            lng: destinationLocation.lng,
+            aliases: destinationLocation.aliases,
+          }
+        : null,
+    });
+    if (databaseResult.routes.length > 0) {
+      return {
+        routes: databaseResult.routes,
+        source: 'database',
+        message: databaseResult.message ?? 'Routes loaded from Lumi transit data.',
+      };
+    }
+
+    if (databaseResult.supportedOrigin && databaseResult.supportedDestination) {
+      return {
+        routes: buildFallbackRoutes(origin, destination),
+        source: 'fallback',
+        message: 'Lumi knows these places but does not have a verified community route for this trip yet.',
+      };
+    }
+  } catch {
+    // Fall through to live routing.
+  }
+
+  try {
+    const [transitResponse, walkResponse] = await Promise.all([
       fetchGoogleRoutesViaProxy(origin, destination, 'TRANSIT', {
         computeAlternativeRoutes: true,
-        transitRoutingPreference: 'LESS_WALKING',
+        transitRoutingPreference: getTransitRoutingPreference(travelModePreference),
+        originLocation,
+        destinationLocation,
       }),
-      fetchGoogleRoutesViaProxy(origin, destination, 'DRIVE'),
-      fetchGoogleRoutesViaProxy(origin, destination, 'WALK'),
+      fetchGoogleRoutesViaProxy(origin, destination, 'WALK', {
+        originLocation,
+        destinationLocation,
+      }),
     ]);
 
-    const liveErrors = [transitResponse.error, driveResponse.error, walkResponse.error].filter(Boolean) as string[];
+    const liveErrors = [transitResponse.error, walkResponse.error].filter(Boolean) as string[];
     const liveRoutes: RouteOption[] = [];
     const transitRoutes = transitResponse.data?.routes ?? [];
 
     for (const route of transitRoutes.slice(0, 4)) {
       const parsed = buildTransitRoute(route, origin, destination, liveRoutes.length);
-      if (parsed) liveRoutes.push(parsed);
-    }
-
-    const driveRoute = driveResponse.data?.routes?.[0];
-    if (driveRoute) {
-      const parsed = buildDriveRoute(driveRoute, origin, destination);
       if (parsed) liveRoutes.push(parsed);
     }
 
@@ -634,27 +697,25 @@ export async function fetchRoutes(from: string, to: string): Promise<RouteFetchR
 
   if (GOOGLE_ROUTES_API_KEY && !isExpoGo()) {
     try {
-      const [transitResponse, driveResponse, walkResponse] = await Promise.all([
+      const [transitResponse, walkResponse] = await Promise.all([
         fetchGoogleRoutes(origin, destination, 'TRANSIT', {
           computeAlternativeRoutes: true,
-          transitRoutingPreference: 'LESS_WALKING',
+          transitRoutingPreference: getTransitRoutingPreference(travelModePreference),
+          originLocation,
+          destinationLocation,
         }),
-        fetchGoogleRoutes(origin, destination, 'DRIVE'),
-        fetchGoogleRoutes(origin, destination, 'WALK'),
+        fetchGoogleRoutes(origin, destination, 'WALK', {
+          originLocation,
+          destinationLocation,
+        }),
       ]);
 
-      const liveErrors = [transitResponse.error, driveResponse.error, walkResponse.error].filter(Boolean) as string[];
+      const liveErrors = [transitResponse.error, walkResponse.error].filter(Boolean) as string[];
       const liveRoutes: RouteOption[] = [];
       const transitRoutes = transitResponse.data?.routes ?? [];
 
       for (const route of transitRoutes.slice(0, 4)) {
         const parsed = buildTransitRoute(route, origin, destination, liveRoutes.length);
-        if (parsed) liveRoutes.push(parsed);
-      }
-
-      const driveRoute = driveResponse.data?.routes?.[0];
-      if (driveRoute) {
-        const parsed = buildDriveRoute(driveRoute, origin, destination);
         if (parsed) liveRoutes.push(parsed);
       }
 

@@ -1,0 +1,402 @@
+[
+  {
+    "slug": "gate-5-karangalan_to_sta-lucia-east-grand-mall",
+    "origin_slug": "gate-5-karangalan",
+    "destination_slug": "sta-lucia-east-grand-mall",
+    "summary": "Walk + jeepney to Sta. Lucia",
+    "source": "community",
+    "confidence": "community-sourced",
+    "source_url": "local-test",
+    "notes": "User-tested route: cross to Felix Ave East Service Road, then ride a jeep signed Sta. Lucia, Cubao, or Tropical.",
+    "total_duration": 14,
+    "total_cost": 13,
+    "total_distance_meters": 2680,
+    "steps": [
+      {
+        "step_order": 1,
+        "mode": "walk",
+        "from_label": "Gate 5 Karangalan",
+        "to_label": "Felix Ave East Service Road",
+        "instruction": "Cross to Felix Ave East Service Road",
+        "duration_minutes": 4,
+        "distance_meters": 280,
+        "cost": 0,
+        "is_estimated": false
+      },
+      {
+        "step_order": 2,
+        "mode": "jeepney",
+        "from_label": "Felix Ave East Service Road",
+        "to_label": "Sta. Lucia East Grand Mall",
+        "instruction": "Ride a jeepney signed Sta. Lucia, Cubao, or Tropical and get off at Sta. Lucia",
+        "line_name": "Sta. Lucia / Cubao / Tropical jeep",
+        "duration_minutes": 10,
+        "distance_meters": 2400,
+        "cost": 13,
+        "is_estimated": false
+      }
+    ]
+  },
+  {
+    "slug": "sta-lucia-east-grand-mall_to_gate-5-karangalan",
+    "origin_slug": "sta-lucia-east-grand-mall",
+    "destination_slug": "gate-5-karangalan",
+    "summary": "Jeepney + walk to Gate 5 Karangalan",
+    "source": "community",
+    "confidence": "community-sourced",
+    "source_url": "local-test",
+    "notes": "Reverse of the user-tested Sta. Lucia route.",
+    "total_duration": 15,
+    "total_cost": 13,
+    "total_distance_meters": 2680,
+    "steps": [
+      {
+        "step_order": 1,
+        "mode": "jeepney",
+        "from_label": "Sta. Lucia East Grand Mall",
+        "to_label": "Felix Ave loading area",
+        "instruction": "Ride a jeepney signed Karangalan or Gate 5 and get off near Felix Ave",
+        "line_name": "Karangalan / Gate 5 jeep",
+        "duration_minutes": 11,
+        "distance_meters": 2400,
+        "cost": 13,
+        "is_estimated": false
+      },
+      {
+        "step_order": 2,
+        "mode": "walk",
+        "from_label": "Felix Ave loading area",
+        "to_label": "Gate 5 Karangalan",
+        "instruction": "Walk into Gate 5 Karangalan",
+        "duration_minutes": 4,
+        "distance_meters": 280,
+        "cost": 0,
+        "is_estimated": false
+      }
+    ]
+  },
+  {
+    "slug": "sta-lucia-east-grand-mall_to_ligaya",
+    "origin_slug": "sta-lucia-east-grand-mall",
+    "destination_slug": "ligaya",
+    "summary": "Jeepney to Ligaya",
+    "source": "community",
+    "confidence": "community-sourced",
+    "source_url": "starter-network",
+    "notes": "Starter community segment along the Marcos Highway corridor.",
+    "total_duration": 9,
+    "total_cost": 13,
+    "total_distance_meters": 1700,
+    "steps": [
+      {
+        "step_order": 1,
+        "mode": "jeepney",
+        "from_label": "Sta. Lucia East Grand Mall",
+        "to_label": "Ligaya",
+        "instruction": "Ride a jeepney toward Ligaya and get off at Ligaya",
+        "line_name": "Ligaya jeep",
+        "duration_minutes": 9,
+        "distance_meters": 1700,
+        "cost": 13,
+        "is_estimated": false
+      }
+    ]
+  },
+  {
+    "slug": "ligaya_to_sta-lucia-east-grand-mall",
+    "origin_slug": "ligaya",
+    "destination_slug": "sta-lucia-east-grand-mall",
+    "summary": "Jeepney to Sta. Lucia",
+    "source": "community",
+    "confidence": "community-sourced",
+    "source_url": "starter-network",
+    "notes": "Starter community segment along the Marcos Highway corridor.",
+    "total_duration": 9,
+    "total_cost": 13,
+    "total_distance_meters": 1700,
+    "steps": [
+      {
+        "step_order": 1,
+        "mode": "jeepney",
+        "from_label": "Ligaya",
+        "to_label": "Sta. Lucia East Grand Mall",
+        "instruction": "Ride a jeepney toward Sta. Lucia and get off at Sta. Lucia",
+        "line_name": "Sta. Lucia jeep",
+        "duration_minutes": 9,
+        "distance_meters": 1700,
+        "cost": 13,
+        "is_estimated": false
+      }
+    ]
+  },
+  {
+    "slug": "ligaya_to_rosario-pasig",
+    "origin_slug": "ligaya",
+    "destination_slug": "rosario-pasig",
+    "summary": "Jeepney via Ligaya - Rosario",
+    "source": "community",
+    "confidence": "community-sourced",
+    "source_url": "starter-network",
+    "notes": "Starter cross-corridor segment between Marikina and Pasig hubs.",
+    "total_duration": 20,
+    "total_cost": 22,
+    "total_distance_meters": 6100,
+    "steps": [
+      {
+        "step_order": 1,
+        "mode": "jeepney",
+        "from_label": "Ligaya",
+        "to_label": "Rosario Pasig",
+        "instruction": "Ride a jeepney through the Ligaya - Rosario corridor and get off at Rosario",
+        "line_name": "Ligaya - Rosario jeep",
+        "duration_minutes": 20,
+        "distance_meters": 6100,
+        "cost": 22,
+        "is_estimated": false
+      }
+    ]
+  },
+  {
+    "slug": "ligaya_to_santolan-pasig",
+    "origin_slug": "ligaya",
+    "destination_slug": "santolan-pasig",
+    "summary": "Jeepney to Santolan Pasig",
+    "source": "community",
+    "confidence": "community-sourced",
+    "source_url": "starter-network",
+    "notes": "Starter segment for the Ligaya - Santolan Pasig corridor.",
+    "total_duration": 11,
+    "total_cost": 13,
+    "total_distance_meters": 2800,
+    "steps": [
+      {
+        "step_order": 1,
+        "mode": "jeepney",
+        "from_label": "Ligaya",
+        "to_label": "Santolan Pasig",
+        "instruction": "Ride a jeepney toward Santolan Pasig and get off in the Santolan area",
+        "line_name": "Ligaya - Santolan jeep",
+        "duration_minutes": 11,
+        "distance_meters": 2800,
+        "cost": 13,
+        "is_estimated": false
+      }
+    ]
+  },
+  {
+    "slug": "santolan-pasig_to_ligaya",
+    "origin_slug": "santolan-pasig",
+    "destination_slug": "ligaya",
+    "summary": "Jeepney to Ligaya",
+    "source": "community",
+    "confidence": "community-sourced",
+    "source_url": "starter-network",
+    "notes": "Starter segment for the Santolan Pasig - Ligaya corridor.",
+    "total_duration": 11,
+    "total_cost": 13,
+    "total_distance_meters": 2800,
+    "steps": [
+      {
+        "step_order": 1,
+        "mode": "jeepney",
+        "from_label": "Santolan Pasig",
+        "to_label": "Ligaya",
+        "instruction": "Ride a jeepney toward Ligaya and get off at Ligaya",
+        "line_name": "Santolan - Ligaya jeep",
+        "duration_minutes": 11,
+        "distance_meters": 2800,
+        "cost": 13,
+        "is_estimated": false
+      }
+    ]
+  },
+  {
+    "slug": "rosario-pasig_to_ligaya",
+    "origin_slug": "rosario-pasig",
+    "destination_slug": "ligaya",
+    "summary": "Jeepney via Rosario - Ligaya",
+    "source": "community",
+    "confidence": "community-sourced",
+    "source_url": "starter-network",
+    "notes": "Starter cross-corridor segment between Pasig and Marikina hubs.",
+    "total_duration": 20,
+    "total_cost": 22,
+    "total_distance_meters": 6100,
+    "steps": [
+      {
+        "step_order": 1,
+        "mode": "jeepney",
+        "from_label": "Rosario Pasig",
+        "to_label": "Ligaya",
+        "instruction": "Ride a jeepney through the Rosario - Ligaya corridor and get off at Ligaya",
+        "line_name": "Rosario - Ligaya jeep",
+        "duration_minutes": 20,
+        "distance_meters": 6100,
+        "cost": 22,
+        "is_estimated": false
+      }
+    ]
+  },
+  {
+    "slug": "santolan-pasig_to_rosario-pasig",
+    "origin_slug": "santolan-pasig",
+    "destination_slug": "rosario-pasig",
+    "summary": "Jeepney to Rosario",
+    "source": "community",
+    "confidence": "community-sourced",
+    "source_url": "starter-network",
+    "notes": "Starter segment for the Santolan Pasig - Rosario corridor.",
+    "total_duration": 17,
+    "total_cost": 15,
+    "total_distance_meters": 4700,
+    "steps": [
+      {
+        "step_order": 1,
+        "mode": "jeepney",
+        "from_label": "Santolan Pasig",
+        "to_label": "Rosario Pasig",
+        "instruction": "Ride a jeepney toward Rosario and get off at Rosario Pasig",
+        "line_name": "Santolan - Rosario jeep",
+        "duration_minutes": 17,
+        "distance_meters": 4700,
+        "cost": 15,
+        "is_estimated": false
+      }
+    ]
+  },
+  {
+    "slug": "rosario-pasig_to_santolan-pasig",
+    "origin_slug": "rosario-pasig",
+    "destination_slug": "santolan-pasig",
+    "summary": "Jeepney to Santolan Pasig",
+    "source": "community",
+    "confidence": "community-sourced",
+    "source_url": "starter-network",
+    "notes": "Starter segment for the Rosario - Santolan Pasig corridor.",
+    "total_duration": 17,
+    "total_cost": 15,
+    "total_distance_meters": 4700,
+    "steps": [
+      {
+        "step_order": 1,
+        "mode": "jeepney",
+        "from_label": "Rosario Pasig",
+        "to_label": "Santolan Pasig",
+        "instruction": "Ride a jeepney toward Santolan Pasig and get off in the Santolan area",
+        "line_name": "Rosario - Santolan jeep",
+        "duration_minutes": 17,
+        "distance_meters": 4700,
+        "cost": 15,
+        "is_estimated": false
+      }
+    ]
+  },
+  {
+    "slug": "rosario-pasig_to_eastwood-city",
+    "origin_slug": "rosario-pasig",
+    "destination_slug": "eastwood-city",
+    "summary": "Jeepney to Eastwood",
+    "source": "community",
+    "confidence": "community-sourced",
+    "source_url": "starter-network",
+    "notes": "Starter segment for the Rosario - Eastwood corridor.",
+    "total_duration": 16,
+    "total_cost": 15,
+    "total_distance_meters": 4500,
+    "steps": [
+      {
+        "step_order": 1,
+        "mode": "jeepney",
+        "from_label": "Rosario Pasig",
+        "to_label": "Eastwood City",
+        "instruction": "Ride a jeepney toward Eastwood and get off near Eastwood City",
+        "line_name": "Rosario - Eastwood jeep",
+        "duration_minutes": 16,
+        "distance_meters": 4500,
+        "cost": 15,
+        "is_estimated": false
+      }
+    ]
+  },
+  {
+    "slug": "eastwood-city_to_rosario-pasig",
+    "origin_slug": "eastwood-city",
+    "destination_slug": "rosario-pasig",
+    "summary": "Jeepney to Rosario",
+    "source": "community",
+    "confidence": "community-sourced",
+    "source_url": "starter-network",
+    "notes": "Starter segment for the Eastwood - Rosario corridor.",
+    "total_duration": 16,
+    "total_cost": 15,
+    "total_distance_meters": 4500,
+    "steps": [
+      {
+        "step_order": 1,
+        "mode": "jeepney",
+        "from_label": "Eastwood City",
+        "to_label": "Rosario Pasig",
+        "instruction": "Ride a jeepney toward Rosario and get off at Rosario Pasig",
+        "line_name": "Eastwood - Rosario jeep",
+        "duration_minutes": 16,
+        "distance_meters": 4500,
+        "cost": 15,
+        "is_estimated": false
+      }
+    ]
+  },
+  {
+    "slug": "rosario-pasig_to_manggahan-pasig",
+    "origin_slug": "rosario-pasig",
+    "destination_slug": "manggahan-pasig",
+    "summary": "Jeepney to Manggahan",
+    "source": "community",
+    "confidence": "community-sourced",
+    "source_url": "starter-network",
+    "notes": "Starter segment for eastern Pasig coverage.",
+    "total_duration": 12,
+    "total_cost": 15,
+    "total_distance_meters": 3600,
+    "steps": [
+      {
+        "step_order": 1,
+        "mode": "jeepney",
+        "from_label": "Rosario Pasig",
+        "to_label": "Manggahan Pasig",
+        "instruction": "Ride a jeepney toward Manggahan and get off at Manggahan Pasig",
+        "line_name": "Rosario - Manggahan jeep",
+        "duration_minutes": 12,
+        "distance_meters": 3600,
+        "cost": 15,
+        "is_estimated": false
+      }
+    ]
+  },
+  {
+    "slug": "manggahan-pasig_to_rosario-pasig",
+    "origin_slug": "manggahan-pasig",
+    "destination_slug": "rosario-pasig",
+    "summary": "Jeepney to Rosario",
+    "source": "community",
+    "confidence": "community-sourced",
+    "source_url": "starter-network",
+    "notes": "Starter segment for eastern Pasig coverage.",
+    "total_duration": 12,
+    "total_cost": 15,
+    "total_distance_meters": 3600,
+    "steps": [
+      {
+        "step_order": 1,
+        "mode": "jeepney",
+        "from_label": "Manggahan Pasig",
+        "to_label": "Rosario Pasig",
+        "instruction": "Ride a jeepney toward Rosario and get off at Rosario Pasig",
+        "line_name": "Manggahan - Rosario jeep",
+        "duration_minutes": 12,
+        "distance_meters": 3600,
+        "cost": 15,
+        "is_estimated": false
+      }
+    ]
+  }
+]

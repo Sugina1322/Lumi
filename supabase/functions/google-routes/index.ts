@@ -6,6 +6,7 @@ const corsHeaders = {
 };
 
 type TravelMode = 'TRANSIT' | 'DRIVE' | 'WALK';
+type LatLng = { latitude: number; longitude: number };
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -31,6 +32,8 @@ Deno.serve(async (req) => {
     const travelMode = String(payload?.travelMode ?? '').trim() as TravelMode;
     const options = payload?.options ?? {};
     const fieldMask = String(payload?.fieldMask ?? '').trim();
+    const originLatLng = payload?.originLatLng as LatLng | undefined;
+    const destinationLatLng = payload?.destinationLatLng as LatLng | undefined;
 
     if (!from || !to || !fieldMask) {
       return Response.json(
@@ -47,8 +50,12 @@ Deno.serve(async (req) => {
     }
 
     const body: Record<string, unknown> = {
-      origin: { address: from },
-      destination: { address: to },
+      origin: originLatLng
+        ? { location: { latLng: originLatLng } }
+        : { address: from },
+      destination: destinationLatLng
+        ? { location: { latLng: destinationLatLng } }
+        : { address: to },
       travelMode,
       languageCode: 'en',
       units: 'METRIC',

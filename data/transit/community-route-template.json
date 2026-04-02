@@ -1,0 +1,27 @@
+{
+  "slug": "origin-slug_to_destination-slug",
+  "origin_slug": "origin-slug",
+  "destination_slug": "destination-slug",
+  "summary": "Short route title",
+  "source": "community",
+  "confidence": "community-sourced",
+  "source_url": "reddit-or-local-test-or-notes",
+  "notes": "How this route was verified.",
+  "total_duration": 0,
+  "total_cost": 0,
+  "total_distance_meters": 0,
+  "steps": [
+    {
+      "step_order": 1,
+      "mode": "walk",
+      "from_label": "Origin",
+      "to_label": "First landmark",
+      "instruction": "Exact instruction text",
+      "line_name": null,
+      "duration_minutes": 0,
+      "distance_meters": 0,
+      "cost": 0,
+      "is_estimated": false
+    }
+  ]
+}

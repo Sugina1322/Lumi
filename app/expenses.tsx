@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -60,6 +63,8 @@ function getToday() {
 
 export default function ExpensesScreen() {
   const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [newLabel, setNewLabel] = useState('');
@@ -94,6 +99,8 @@ export default function ExpensesScreen() {
       .filter((expense) => expense.category === category.key)
       .reduce((sum, expense) => sum + expense.amount, 0),
   })).filter((category) => category.total > 0);
+  const isNarrow = width < 390;
+  const contentPadding = Math.max(100, insets.bottom + 88);
 
   const handleAdd = useCallback(() => {
     const amount = parseFloat(newAmount);
@@ -137,6 +144,10 @@ export default function ExpensesScreen() {
   };
 
   return (
+    <KeyboardAvoidingView
+      style={styles.safeArea}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.surface }]}>
       <View style={[styles.backgroundGlow, { backgroundColor: theme.primarySoft }]} />
 
@@ -164,8 +175,8 @@ export default function ExpensesScreen() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <View style={[styles.summaryCard, { backgroundColor: theme.hero, shadowColor: theme.shadow }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: contentPadding }, isNarrow && styles.contentNarrow]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <View style={[styles.summaryCard, isNarrow && styles.summaryCardNarrow, { backgroundColor: theme.hero, shadowColor: theme.shadow }]}>
           <View style={[styles.summaryGlowTop, { backgroundColor: theme.heroAlt }]} />
           <View style={[styles.summaryGlowBottom, { backgroundColor: theme.accent }]} />
 
@@ -173,7 +184,7 @@ export default function ExpensesScreen() {
           <Text style={styles.summaryAmount}>PHP {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
 
           <View style={styles.summaryDivider} />
-          <View style={styles.summaryRow}>
+          <View style={[styles.summaryRow, isNarrow && styles.summaryRowNarrow]}>
             <View style={styles.summaryColumn}>
               <Text style={styles.summaryColumnLabel}>Today</Text>
               <Text style={styles.summaryColumnValue}>PHP {todayTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
@@ -191,7 +202,7 @@ export default function ExpensesScreen() {
             {categoryTotals.map((category) => (
               <View
                 key={category.key}
-                style={[styles.categoryPill, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}
+                style={[styles.categoryPill, isNarrow && styles.categoryPillNarrow, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}
               >
                 <Ionicons name={category.icon as any} size={14} color={theme.primary} />
                 <Text style={[styles.categoryPillText, { color: theme.mutedText }]}>{category.label}</Text>
@@ -207,7 +218,7 @@ export default function ExpensesScreen() {
             {expenses.map((expense) => (
               <Pressable
                 key={expense.id}
-                style={[styles.expenseRow, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}
+                style={[styles.expenseRow, isNarrow && styles.expenseRowNarrow, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}
                 onLongPress={() => handleDelete(expense.id)}
               >
                 <View style={[styles.expenseIcon, { backgroundColor: theme.primarySoft }]}>
@@ -217,7 +228,7 @@ export default function ExpensesScreen() {
                   <Text style={[styles.expenseLabel, { color: theme.text }]}>{expense.label}</Text>
                   <Text style={[styles.expenseDate, { color: theme.mutedText }]}>{expense.date}</Text>
                 </View>
-                <Text style={styles.expenseAmount}>- PHP {expense.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
+                <Text style={[styles.expenseAmount, isNarrow && styles.expenseAmountNarrow]}>- PHP {expense.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
                 <Pressable onPress={() => handleDelete(expense.id)} hitSlop={8}>
                   <Ionicons name="close-circle" size={18} color={theme.mutedText} />
                 </Pressable>
@@ -233,7 +244,7 @@ export default function ExpensesScreen() {
         )}
 
         {showAdd ? (
-          <View style={[styles.addCard, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}>
+          <View style={[styles.addCard, isNarrow && styles.cardNarrow, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}>
             <Text style={[styles.addTitle, { color: theme.text }]}>Log expense</Text>
 
             <Text style={[styles.fieldLabel, { color: theme.mutedText }]}>Category</Text>
@@ -273,7 +284,7 @@ export default function ExpensesScreen() {
               onChangeText={setNewAmount}
             />
 
-            <View style={styles.addActions}>
+            <View style={[styles.addActions, isNarrow && styles.addActionsNarrow]}>
               <Pressable style={[styles.cancelButton, { backgroundColor: theme.primarySoft }]} onPress={() => setShowAdd(false)}>
                 <Text style={[styles.cancelButtonText, { color: theme.primary }]}>Cancel</Text>
               </Pressable>
@@ -287,11 +298,18 @@ export default function ExpensesScreen() {
       </ScrollView>
 
       {!showAdd ? (
-        <Pressable style={[styles.fab, { backgroundColor: theme.primary, shadowColor: theme.shadow }]} onPress={() => setShowAdd(true)}>
+        <Pressable
+          style={[
+            styles.fab,
+            { backgroundColor: theme.primary, shadowColor: theme.shadow, bottom: insets.bottom + 16 },
+          ]}
+          onPress={() => setShowAdd(true)}
+        >
           <Ionicons name="add" size={28} color="#FFFFFF" />
         </Pressable>
       ) : null}
     </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -339,6 +357,9 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 100,
   },
+  contentNarrow: {
+    paddingHorizontal: 16,
+  },
   summaryCard: {
     borderRadius: 26,
     padding: 22,
@@ -347,6 +368,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.16,
     shadowRadius: 24,
     elevation: 7,
+  },
+  summaryCardNarrow: {
+    padding: 18,
+    borderRadius: 22,
   },
   summaryGlowTop: {
     position: 'absolute',
@@ -385,6 +410,11 @@ const styles = StyleSheet.create({
   summaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  summaryRowNarrow: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 12,
   },
   summaryColumn: {
     flex: 1,
@@ -425,6 +455,10 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 2,
   },
+  categoryPillNarrow: {
+    width: '100%',
+    justifyContent: 'space-between',
+  },
   categoryPillText: {
     fontSize: 12,
     fontWeight: '700',
@@ -454,6 +488,10 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 3,
   },
+  expenseRowNarrow: {
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+  },
   expenseIcon: {
     width: 40,
     height: 40,
@@ -477,6 +515,11 @@ const styles = StyleSheet.create({
     color: '#C0396A',
     fontSize: 14,
     fontWeight: '800',
+  },
+  expenseAmountNarrow: {
+    width: '100%',
+    marginLeft: 52,
+    marginTop: -4,
   },
   emptyState: {
     alignItems: 'center',
@@ -502,6 +545,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 18,
     elevation: 4,
+  },
+  cardNarrow: {
+    padding: 16,
+    borderRadius: 20,
   },
   addTitle: {
     fontSize: 16,
@@ -544,6 +591,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginTop: 18,
+  },
+  addActionsNarrow: {
+    flexDirection: 'column',
   },
   cancelButton: {
     flex: 1,
