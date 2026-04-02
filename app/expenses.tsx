@@ -179,11 +179,22 @@ export default function ExpensesScreen() {
         <View style={[styles.summaryCard, isNarrow && styles.summaryCardNarrow, { backgroundColor: theme.hero, shadowColor: theme.shadow }]}>
           <View style={[styles.summaryGlowTop, { backgroundColor: theme.heroAlt }]} />
           <View style={[styles.summaryGlowBottom, { backgroundColor: theme.accent }]} />
+          <View style={[styles.receiptCutoutLeft, { backgroundColor: theme.surface }]} />
+          <View style={[styles.receiptCutoutRight, { backgroundColor: theme.surface }]} />
+
+          <View style={styles.summaryReceiptHeader}>
+            <Text style={styles.summaryEyebrow}>LUMI RECEIPT</Text>
+            <Ionicons name="receipt-outline" size={18} color="rgba(255,255,255,0.86)" />
+          </View>
 
           <Text style={styles.summaryLabel}>Total expenses</Text>
           <Text style={styles.summaryAmount}>PHP {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text>
 
-          <View style={styles.summaryDivider} />
+          <View style={styles.summaryPerforationRow}>
+            {Array.from({ length: isNarrow ? 12 : 16 }).map((_, index) => (
+              <View key={index} style={styles.summaryPerforationDot} />
+            ))}
+          </View>
           <View style={[styles.summaryRow, isNarrow && styles.summaryRowNarrow]}>
             <View style={styles.summaryColumn}>
               <Text style={styles.summaryColumnLabel}>Today</Text>
@@ -373,6 +384,18 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: 22,
   },
+  summaryReceiptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  summaryEyebrow: {
+    color: 'rgba(255,255,255,0.74)',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
   summaryGlowTop: {
     position: 'absolute',
     top: -20,
@@ -391,6 +414,22 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     opacity: 0.22,
   },
+  receiptCutoutLeft: {
+    position: 'absolute',
+    left: -15,
+    top: '54%',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+  },
+  receiptCutoutRight: {
+    position: 'absolute',
+    right: -15,
+    top: '54%',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+  },
   summaryLabel: {
     color: 'rgba(255,255,255,0.74)',
     fontSize: 12,
@@ -402,10 +441,17 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: 4,
   },
-  summaryDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+  summaryPerforationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginVertical: 16,
+  },
+  summaryPerforationDot: {
+    width: 8,
+    height: 2,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.28)',
   },
   summaryRow: {
     flexDirection: 'row',
